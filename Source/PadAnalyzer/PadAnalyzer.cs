@@ -27,11 +27,19 @@ namespace PadAnalyzer
             this.Close();
         }
 
+        String currentFileName;
         private void loadPDBToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (bgWorker.IsBusy)
+            {
+                return;
+            }
+
             if (openPdbDialog.ShowDialog() == DialogResult.OK)
             {
                 progressBar.Value = 0;
+                currentFileName = System.IO.Path.GetFileName(openPdbDialog.FileName);
+                this.Text = "Pad Analyzer: Loading " + currentFileName;
                 bgWorker.RunWorkerAsync(openPdbDialog.FileName);
             }
         }
@@ -507,6 +515,8 @@ namespace PadAnalyzer
             bindingSourceSymbols.Filter = null;// "Symbol LIKE '*rde*'";
 
             ShowSelectedSymbolInfo();
+
+            this.Text = "Pad Analyzer: Loaded " + currentFileName;
         }
     }
 }

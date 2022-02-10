@@ -20,6 +20,16 @@ namespace PadAnalyzer
 
             dataGridSymbols.Columns[0].Width = 271;
             progressBar.Maximum = progressBar.Width;
+
+            string[] arguments = Environment.GetCommandLineArgs();
+
+            if (arguments.Length == 2)
+            {
+                String path = arguments[1];
+                currentFileName = System.IO.Path.GetFileName(path);
+                this.Text = "Pad Analyzer: Loading " + currentFileName;
+                bgWorker.RunWorkerAsync(path);
+            }
         }
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)

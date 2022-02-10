@@ -138,7 +138,14 @@ namespace CsDebugScript.DwarfSymbolProvider
         SecOffset = 0x17,
         ExpressionLocation = 0x18,
         FlagPresent = 0x19,
+        Addrx = 0x1b,
         RefSig8 = 0x20,
+        Loclistx = 0x22,
+        Rnglistx = 0x23,
+        Strx1 = 0x25,
+        Strx2 = 0x26,
+        Strx3 = 0x27,
+        Strx4 = 0x28,
     }
 
     /// <summary>
@@ -244,6 +251,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         ConstExpr = 0x6c,
         EnumClass = 0x6d,
         LinkageName = 0x6e,
+        StrOffsetsBase = 0x72,
         HpBlockIndex = 0x2000,
         LoUser = 0x2000,
         MipsFde = 0x2001,

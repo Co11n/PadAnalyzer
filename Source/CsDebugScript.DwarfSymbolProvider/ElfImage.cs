@@ -115,6 +115,17 @@ namespace CsDebugScript.DwarfSymbolProvider
         }
 
         /// <summary>
+        /// Gets the debug data strings.
+        /// </summary>
+        public byte[] DebugStringOffsets
+        {
+            get
+            {
+                return LoadSection(".debug_str_offsets");
+            }
+        }
+        
+        /// <summary>
         /// Gets the debug frame.
         /// </summary>
         public byte[] DebugFrame

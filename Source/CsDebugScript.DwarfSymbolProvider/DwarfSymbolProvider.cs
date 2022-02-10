@@ -40,7 +40,7 @@ namespace CsDebugScript.DwarfSymbolProvider
                 {
                     using (IDwarfImage image = LoadImage(location, module.LoadOffset))
                     {
-                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.NormalizeAddress);
+                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
                         var lineNumberPrograms = ParseLineNumberPrograms(image.DebugLine, image.NormalizeAddress);
                         var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
 
@@ -63,7 +63,7 @@ namespace CsDebugScript.DwarfSymbolProvider
                     {
                         var lineNumberPrograms = new DwarfLineNumberProgram[0];
                         var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
-                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.NormalizeAddress);
+                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
 
                         if (compilationUnits.Length != 0 || commonInformationEntries.Length != 0)
                             return new DwarfSymbolProviderModule(location, null, compilationUnits, lineNumberPrograms, commonInformationEntries, image.PublicSymbols, image.CodeSegmentOffset, image.Is64bit);
@@ -100,17 +100,18 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="debugDataDescription">The debug data description.</param>
         /// <param name="debugStrings">The debug strings.</param>
         /// <param name="addressNormalizer">Normalize address delegate (<see cref="NormalizeAddressDelegate"/>)</param>
-        private static DwarfCompilationUnit[] ParseCompilationUnits(byte[] debugData, byte[] debugDataDescription, byte[] debugStrings, NormalizeAddressDelegate addressNormalizer)
+        private static DwarfCompilationUnit[] ParseCompilationUnits(byte[] debugData, byte[] debugDataDescription, byte[] debugStrings, byte[] debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
         {
             using (DwarfMemoryReader debugDataReader = new DwarfMemoryReader(debugData))
             using (DwarfMemoryReader debugDataDescriptionReader = new DwarfMemoryReader(debugDataDescription))
             using (DwarfMemoryReader debugStringsReader = new DwarfMemoryReader(debugStrings))
+            using (DwarfMemoryReader debugStringOffsetsReader = new DwarfMemoryReader(debugStringOffsets))
             {
                 List<DwarfCompilationUnit> compilationUnits = new List<DwarfCompilationUnit>();
 
                 while (!debugDataReader.IsEnd)
                 {
-                    DwarfCompilationUnit compilationUnit = new DwarfCompilationUnit(debugDataReader, debugDataDescriptionReader, debugStringsReader, addressNormalizer);
+                    DwarfCompilationUnit compilationUnit = new DwarfCompilationUnit(debugDataReader, debugDataDescriptionReader, debugStringsReader, debugStringOffsetsReader, addressNormalizer);
 
                     compilationUnits.Add(compilationUnit);
                 }

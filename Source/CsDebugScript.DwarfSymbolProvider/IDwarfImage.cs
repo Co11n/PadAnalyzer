@@ -69,6 +69,8 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// </summary>
         byte[] DebugDataStrings { get; }
 
+        byte[] DebugStringOffsets { get; }
+
         /// <summary>
         /// Gets the debug line.
         /// </summary>

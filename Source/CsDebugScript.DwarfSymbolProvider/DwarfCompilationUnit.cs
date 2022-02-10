@@ -20,9 +20,9 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="debugDataDescription">The debug data description stream.</param>
         /// <param name="debugStrings">The debug strings.</param>
         /// <param name="addressNormalizer">Normalize address delegate (<see cref="NormalizeAddressDelegate"/>)</param>
-        public DwarfCompilationUnit(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings, NormalizeAddressDelegate addressNormalizer)
+        public DwarfCompilationUnit(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings, DwarfMemoryReader debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
         {
-            ReadData(debugData, debugDataDescription, debugStrings, addressNormalizer);
+            ReadData(debugData, debugDataDescription, debugStrings, debugStringOffsets, addressNormalizer);
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="debugDataDescription">The debug data description.</param>
         /// <param name="debugStrings">The debug strings.</param>
         /// <param name="addressNormalizer">Normalize address delegate (<see cref="NormalizeAddressDelegate"/>)</param>
-        private void ReadData(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings, NormalizeAddressDelegate addressNormalizer)
+        private void ReadData(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings, DwarfMemoryReader debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
         {
             // Read header
             bool is64bit;
@@ -56,13 +56,33 @@ namespace CsDebugScript.DwarfSymbolProvider
             ulong length = debugData.ReadLength(out is64bit);
             int endPosition = debugData.Position + (int)length;
             ushort version = debugData.ReadUshort();
-            int debugDataDescriptionOffset = debugData.ReadOffset(is64bit);
-            byte addressSize = debugData.ReadByte();
+            int debugDataDescriptionOffset;
+            byte addressSize;
+            byte UnitType = 1; //DW_UT_compile
+
+            if (version >= 5)
+            {
+                UnitType = debugData.ReadByte();
+                addressSize = debugData.ReadByte();
+                debugDataDescriptionOffset = debugData.ReadOffset(is64bit);
+            }
+            else
+            {
+                debugDataDescriptionOffset = debugData.ReadOffset(is64bit);
+                addressSize = debugData.ReadByte();
+            }
+
+            if (UnitType != 1) return;
+
             DataDescriptionReader dataDescriptionReader = new DataDescriptionReader(debugDataDescription, debugDataDescriptionOffset);
 
             // Read data
             List<DwarfSymbol> symbols = new List<DwarfSymbol>();
             Stack<DwarfSymbol> parents = new Stack<DwarfSymbol>();
+
+            int OffsetByteSize = 4;
+            ulong unitStringOffsetsBase = 0;
+            ulong unitStringOffsetsSize = 0;
 
             while (debugData.Position < endPosition)
             {
@@ -93,6 +113,8 @@ namespace CsDebugScript.DwarfSymbolProvider
                     DwarfAttribute attribute = descriptionAttribute.Attribute;
                     DwarfFormat format = descriptionAttribute.Format;
                     DwarfAttributeValue attributeValue = new DwarfAttributeValue();
+
+
 
                     switch (format)
                     {
@@ -192,9 +214,55 @@ namespace CsDebugScript.DwarfSymbolProvider
                             attributeValue.Type = DwarfAttributeValueType.SecOffset;
                             attributeValue.Value = (ulong)debugData.ReadOffset(is64bit);
                             break;
+                        case DwarfFormat.Strx1:
+                            attributeValue.Type = DwarfAttributeValueType.Invalid;
+                            attributeValue.Value = (ulong)debugData.ReadByte();
+                            break;
+                        case DwarfFormat.Strx2:
+                            attributeValue.Type = DwarfAttributeValueType.Invalid;
+                            attributeValue.Value = (ulong)debugData.ReadUshort();
+                            break;
+                        case DwarfFormat.Strx3:
+                            attributeValue.Type = DwarfAttributeValueType.Invalid;
+                            attributeValue.Value = (ulong)debugData.ReadByte() + 8 * (ulong)debugData.ReadUshort();
+                            break;
+                        case DwarfFormat.Strx4:
+                            attributeValue.Type = DwarfAttributeValueType.Invalid;
+                            attributeValue.Value = (ulong)debugData.ReadUint();
+                            break;
+                        case DwarfFormat.Rnglistx:
+                        case DwarfFormat.Loclistx:
+                        case DwarfFormat.Addrx:
+                            attributeValue.Type = DwarfAttributeValueType.Invalid;
+                            attributeValue.Value = (ulong)debugData.SLEB128();
+                            break;
                         default:
                             throw new Exception($"Unsupported DwarfFormat: {format}");
                     }
+
+                    if (unitStringOffsetsSize > 0 && (format == DwarfFormat.Strx1 || format == DwarfFormat.Strx2 || format == DwarfFormat.Strx4))
+                    {
+                        debugStringOffsets.Position = (int)unitStringOffsetsBase + (int)attributeValue.SecOffset * OffsetByteSize;
+                        int offset = debugStringOffsets.ReadOffset(is64bit);
+                        attributeValue.Type = DwarfAttributeValueType.String;
+                        attributeValue.Value = debugStrings.ReadString(offset);
+                    }
+
+                    if (attribute == DwarfAttribute.StrOffsetsBase)
+                    {
+                        debugStringOffsets.Position = (int)attributeValue.SecOffset - (is64bit ? 16 : 8);
+
+                        bool is64bitOfs; // should be the same as is64bit
+                        ulong ContributionSize = debugStringOffsets.ReadLength(out is64bitOfs);
+                        ushort Version = debugStringOffsets.ReadUshort();
+                        debugStringOffsets.ReadUshort(); // padding
+
+                        OffsetByteSize = is64bitOfs ? 8 : 4;
+
+                        unitStringOffsetsBase = attributeValue.SecOffset;
+                        unitStringOffsetsSize = ContributionSize;
+                    }
+
 
                     bool skipAttribute = true;
                     if (attribute == DwarfAttribute.Name || 

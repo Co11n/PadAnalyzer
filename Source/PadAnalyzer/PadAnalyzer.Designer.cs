@@ -41,6 +41,7 @@
             this.textBoxCache = new System.Windows.Forms.MaskedTextBox();
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
+            this.tablePresentationComboBox = new System.Windows.Forms.ComboBox();
             this.textBoxFilter = new System.Windows.Forms.TextBox();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.dataGridSymbols = new System.Windows.Forms.DataGridView();
@@ -53,6 +54,7 @@
             this.copyTypeLayoutToClipboardToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.setPrefetchStartOffsetToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.bgWorker = new System.ComponentModel.BackgroundWorker();
+            this.bgWorkerTableData = new System.ComponentModel.BackgroundWorker();
             this.mainMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSourceSymbols)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
@@ -121,6 +123,7 @@
             this.splitContainer2.Panel1.Controls.Add(this.label2);
             this.splitContainer2.Panel1.Controls.Add(this.label1);
             this.splitContainer2.Panel1.Controls.Add(this.textBoxFilter);
+            this.splitContainer2.Panel1.Controls.Add(this.tablePresentationComboBox);
             // 
             // splitContainer2.Panel2
             // 
@@ -172,6 +175,20 @@
             this.textBoxFilter.Size = new System.Drawing.Size(179, 20);
             this.textBoxFilter.TabIndex = 0;
             this.textBoxFilter.TextChanged += new System.EventHandler(this.textBoxFilter_TextChanged);
+
+            //
+            // Creating comboBox for different data presentation (Class fields data/Global data/Static class data)
+            //
+            tablePresentationComboBox.Location = new System.Drawing.Point(53, 40);
+            tablePresentationComboBox.Name = "Presentation combo box";
+            tablePresentationComboBox.Size = new System.Drawing.Size(179, 20);
+            tablePresentationComboBox.TabIndex = 0;
+            string[] installs = new string[] { "Class field info", "Class static data", "Global static data"};
+            tablePresentationComboBox.Items.AddRange(installs);
+            tablePresentationComboBox.Text = "Class field info";
+            tablePresentationComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            tablePresentationComboBox.SelectedIndexChanged += new System.EventHandler(tablePresentationComboBox_ItemChanged);
+
             // 
             // splitContainer1
             // 
@@ -284,6 +301,15 @@
             this.bgWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.bgWorker_DoWork);
             this.bgWorker.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.bgWorker_ProgressChanged);
             this.bgWorker.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.bgWorker_RunWorkerCompleted);
+
+            //
+            // bgWorkerTableData
+            //
+            this.bgWorkerTableData.WorkerReportsProgress = true;
+            this.bgWorkerTableData.DoWork += new System.ComponentModel.DoWorkEventHandler(this.bgWorkerTableData_DoWork);
+            this.bgWorkerTableData.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.bgWorkerTableData_ProgressChanged);
+            this.bgWorkerTableData.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.bgWorkerTableData_RunWorkerCompleted);
+
             // 
             // PadAnalyzer
             // 
@@ -329,6 +355,7 @@
         private System.Windows.Forms.DataGridView dataGridViewSymbolInfo;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox textBoxFilter;
+        private System.Windows.Forms.ComboBox tablePresentationComboBox;
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
         private System.Windows.Forms.ToolStripMenuItem copyTypeLayoutToClipboardToolStripMenuItem;
         private System.Windows.Forms.Label label2;
@@ -336,6 +363,7 @@
         private System.Windows.Forms.ToolStripMenuItem setPrefetchStartOffsetToolStripMenuItem;
         private System.Windows.Forms.ProgressBar progressBar;
         private System.ComponentModel.BackgroundWorker bgWorker;
+        private System.ComponentModel.BackgroundWorker bgWorkerTableData;
         private System.Windows.Forms.DataGridViewTextBoxColumn colField;
         private System.Windows.Forms.DataGridViewTextBoxColumn colFieldOffset;
         private System.Windows.Forms.DataGridViewTextBoxColumn colFieldSize;

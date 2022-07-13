@@ -252,7 +252,11 @@ namespace CsDebugScript.Engine.SymbolProviders
                     continue;
                 }
 
-                typeFields.Add(Tuple.Create(field.name, field.typeId, field.relativeVirtualAddress + Module.Offset));
+                //typeFields.Add(Tuple.Create(field.name, field.typeId, field.relativeVirtualAddress + Module.Offset));
+                ulong type_address_section = field.addressSection;
+                ulong type_address_offset = field.addressOffset;
+
+                typeFields.Add(Tuple.Create(field.name, field.typeId, type_address_section + type_address_offset));
             }
 
             return typeFields;

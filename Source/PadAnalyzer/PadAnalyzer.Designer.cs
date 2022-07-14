@@ -183,11 +183,13 @@
             tablePresentationComboBox.Name = "Presentation combo box";
             tablePresentationComboBox.Size = new System.Drawing.Size(179, 20);
             tablePresentationComboBox.TabIndex = 0;
-            string[] installs = new string[] { "Class field info", "Class static data", "Global static data"};
+
+            string[] installs = new string[] { "Class field data", "Class static field data", "Global static data"};
             tablePresentationComboBox.Items.AddRange(installs);
-            tablePresentationComboBox.Text = "Class field info";
+            tablePresentationComboBox.Text = "Class field data";
             tablePresentationComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             tablePresentationComboBox.SelectedIndexChanged += new System.EventHandler(tablePresentationComboBox_ItemChanged);
+            tablePresentationComboBox.Enabled = true;
 
             // 
             // splitContainer1

@@ -15,7 +15,7 @@ namespace PadAnalyzer
         {
             InitializeComponent();
             m_table = new DataTable("Symbols");
-            CreateDataTable(m_table, "Class field info");
+            CreateDataTable(m_table, TableViewTypes.ClassFieldData);
             bindingSourceSymbols.DataSource = m_table;
             dataGridSymbols.DataSource = bindingSourceSymbols;
 
@@ -32,6 +32,22 @@ namespace PadAnalyzer
                 bgWorker.RunWorkerAsync(path);
             }
         }
+
+        enum TableViewTypes
+        {
+            NoneType = 0,
+            ClassFieldData,
+            ClassStaticData,
+            GlobalStaticData
+        };
+
+        Dictionary<string, TableViewTypes> dictViewTableTypes =
+            new Dictionary<string, TableViewTypes>()
+        {
+            {"Class field data", TableViewTypes.ClassFieldData},
+            {"Class static field data", TableViewTypes.ClassStaticData},
+            {"Global static data", TableViewTypes.GlobalStaticData}
+        };
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -55,30 +71,30 @@ namespace PadAnalyzer
             }
         }
 
-        void CreateDataTable(DataTable table, string table_type)
+        void CreateDataTable(DataTable table, TableViewTypes tableType)
         {
             Dictionary<string, Type> columnNames = new Dictionary<string, Type>();
-        
-            if (table_type == "Class field info")
+            
+            if (tableType == TableViewTypes.ClassFieldData)
             {
                 columnNames["Symbol"] = System.Type.GetType("System.String");
                 columnNames["Size"] = System.Type.GetType("System.Int32");
                 columnNames["Padding"] = System.Type.GetType("System.Int32");
                 columnNames["Padding/Size"] = System.Type.GetType("System.Int32");                
             }
-            else if (table_type == "Class static data")
+            else if (tableType == TableViewTypes.ClassStaticData)
             {
                 columnNames["Symbol"] = System.Type.GetType("System.String");
                 columnNames["Size"] = System.Type.GetType("System.Int32");
                 columnNames["Type"] = System.Type.GetType("System.String");
             }
-            else if (table_type == "Global static data")
+            else if (tableType == TableViewTypes.GlobalStaticData)
             {
 
             }
             else
             {
-
+                throw new ArgumentException("Not correct parameter", nameof(tableType));
             }
 
             foreach (string columnName in columnNames.Keys)
@@ -89,6 +105,7 @@ namespace PadAnalyzer
                     DataType = columnNames[columnName],
                     ReadOnly = true
                 };
+
                 table.Columns.Add(column);
             }
         }
@@ -157,8 +174,6 @@ namespace PadAnalyzer
             {
                 if (!m_symbols.ContainsKey(name))
                 {
-                    //CodeTypeTag GetTypeTag(uint typeId);
-
                     SymbolInfo info = new SymbolInfo()
                     {
                         m_name = name,
@@ -245,45 +260,47 @@ namespace PadAnalyzer
             string typeName = sym.GetTypeName(typeId);
             ulong typeSize = sym.GetTypeSize(typeId);
 
-            info = new SymbolInfo();
+            info = new SymbolInfo()
+            {
+                m_name = "Base: " + typeName,
+                m_type_id = typeId,
+                m_size = (int)typeSize,
+                m_offset = memOffset,
+                m_type_name = typeName
+            };
 
-            SymbolInfo typeInfo = null;
+            SymbolInfo typeInfo = TryAddSymbol(typeId);
             int count = 1;
-
-            typeInfo = TryAddSymbol(typeId);
 
             if (typeInfo != null)
             {
                 info.m_padding += typeInfo.m_padding * count;
             }
 
-            info.Set("Base: " + typeName, typeId, (int)typeSize, memOffset, typeName);
-
             return true;
         }
 
         bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
         {
-            string symbolName = sym.GetTypeName(typeId);
-
-            info = new SymbolInfo();
-
+            string symbolTypeName = sym.GetTypeName(typeId);
             ulong len = sym.GetTypeSize(typeId);
-            if (symbolName != null)
+
+            info = new SymbolInfo()
             {
+                m_name = fieldName,
+                m_type_id = typeId,
+                m_size = (int)len,
+                m_offset = memOffset,
+                m_type_name = symbolTypeName
+            };
 
-                SymbolInfo typeInfo = null;
-                int count = 1;
+            SymbolInfo typeInfo = TryAddSymbol(typeId);
+            int count = 1;
 
-                typeInfo = TryAddSymbol(typeId);
-
-                if (typeInfo != null)
-                {
-                    info.m_padding += typeInfo.m_padding * count;
-                }
+            if (typeInfo != null)
+            {
+                info.m_padding += typeInfo.m_padding * count;
             }
-
-            info.Set(fieldName, typeId, (int)len, memOffset, symbolName);
 
             return true;
         }
@@ -368,11 +385,13 @@ namespace PadAnalyzer
 
             if (info != null)
             {
-                if (this.tablePresentationComboBox.Text == "Class field info")
+                TableViewTypes selectedTableView = dictViewTableTypes[this.tablePresentationComboBox.Text];
+
+                if (selectedTableView == TableViewTypes.ClassFieldData)
                 {
                     ShowSymbolInfo(info);
                 }
-                else if (this.tablePresentationComboBox.Text == "Class static data")
+                else if (selectedTableView == TableViewTypes.ClassStaticData)
                 {
                     ShowSymbolStaticInfo(info);
                 }                
@@ -420,22 +439,8 @@ namespace PadAnalyzer
 
         void ShowSymbolStaticInfo(SymbolInfo info)
         {
-            dataGridViewSymbolInfo.Rows.Clear();
-
-            string[] static_fields_list = sym.GetTypeStaticFieldNames(info.m_type_id);
-
-            foreach (string static_field_name in static_fields_list)
-            {
-                Tuple<uint, ulong> field_info = sym.GetTypeStaticFieldTypeAndAddress(info.m_type_id, static_field_name);
-
-                uint static_field_type_id = field_info.Item1;
-                ulong static_field_offset = field_info.Item2;
-                string static_field_type = sym.GetTypeName(static_field_type_id);
-                uint static_field_size = sym.GetTypeSize(static_field_type_id);
-
-                string[] row = { static_field_name, static_field_offset.ToString("G"), static_field_size.ToString("G"), static_field_type };
-                dataGridViewSymbolInfo.Rows.Add(row);
-            }
+            // Nothing to show at the moment
+            dataGridViewSymbolInfo.Rows.Clear();            
         }
 
         private void dataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
@@ -542,40 +547,65 @@ namespace PadAnalyzer
         }
         private void tablePresentationComboBox_ItemChanged(object sender, EventArgs e)
         {
-            ComboBox comboBox = (ComboBox)sender;
-            string typeId = comboBox.Text;
+            ComboBox viewTablecomboBox = (ComboBox)sender;
+            TableViewTypes selectedTableView = dictViewTableTypes[this.tablePresentationComboBox.Text];
 
             // Workaround needs to be redone
             m_table.Rows.Clear();
             m_table.Columns.Clear();
 
             m_table = new DataTable("Symbols");
-            CreateDataTable(m_table, typeId);
+            CreateDataTable(m_table, selectedTableView);
 
             bindingSourceSymbols.DataSource = m_table;
 
-            this.bgWorkerTableData.RunWorkerAsync(typeId);
+            if (this.bgWorkerTableData.IsBusy)
+            {
+                MessageBox.Show("Cannot change the item. Table is still processing.");
+            }
+            else
+            {
+                this.bgWorkerTableData.RunWorkerAsync(selectedTableView);
+                this.tablePresentationComboBox.Enabled = false;
+            }
         }
 
-        private void FillDataTable(string tableType)
+        private void FillDataTable(object sender, TableViewTypes selectedTableView)
         {
+            BackgroundWorker worker = sender as BackgroundWorker;
+
+            int cntAllSymbols = m_symbols.Count;
+            int progressPercent = 0;
+            int prevProgressPercent = -1;
+            int i = 0;
+
             m_table.BeginLoadData();
 
-            if (tableType == "Class field info")
+            if (selectedTableView == TableViewTypes.ClassFieldData)
             {
                 foreach (SymbolInfo info in m_symbols.Values)
                 {
-                    long totalPadding = info.m_padding;
-
                     DataRow row = m_table.NewRow();
+
                     row["Symbol"] = info.m_name;
                     row["Size"] = info.m_size;
-                    row["Padding"] = totalPadding;
-                    row["Padding/Size"] = (double)totalPadding / info.m_size;
+                    row["Padding"] = info.m_padding;
+                    row["Padding/Size"] = (double)info.m_padding / info.m_size;
+
                     m_table.Rows.Add(row);
+
+                    // Calculate the current progress
+                    i++;
+                    progressPercent = (int)((i * 100) / cntAllSymbols);
+
+                    if (prevProgressPercent < progressPercent)
+                    {
+                        worker.ReportProgress(progressPercent);
+                        prevProgressPercent = progressPercent;
+                    }
                 }
             }
-            else if (tableType == "Class static data")
+            else if (selectedTableView == TableViewTypes.ClassStaticData)
             {
                 foreach (SymbolInfo info in m_symbols.Values)
                 {
@@ -602,7 +632,22 @@ namespace PadAnalyzer
 
                         m_table.Rows.Add(row);
                     }
+
+
+                    // Calculate the current progress
+                    i++;
+                    progressPercent = (int)((i * 100) / cntAllSymbols);
+
+                    if (prevProgressPercent < progressPercent)
+                    {
+                        worker.ReportProgress(progressPercent);
+                        prevProgressPercent = progressPercent;
+                    }
                 }
+            }
+            else if (selectedTableView == TableViewTypes.ClassStaticData)
+            {
+
             }
 
             m_table.EndLoadData();            
@@ -610,11 +655,11 @@ namespace PadAnalyzer
 
         private void bgWorkerTableData_DoWork(object sender, DoWorkEventArgs e)
         {
-            FillDataTable(e.Argument as string);
+            FillDataTable(sender, (TableViewTypes)e.Argument);
         }
         private void bgWorkerTableData_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-
+            progressBar.Value = (int)((progressBar.Maximum * e.ProgressPercentage) / 100);
         }
 
         private void bgWorkerTableData_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
@@ -624,6 +669,9 @@ namespace PadAnalyzer
             bindingSourceSymbols.Filter = null;// "Symbol LIKE '*rde*'";
 
             ShowSelectedSymbolInfo();
+
+            this.progressBar.Value = progressBar.Maximum;
+            this.tablePresentationComboBox.Enabled = true;
         }
         private void bgWorker_DoWork(object sender, DoWorkEventArgs e)
         {

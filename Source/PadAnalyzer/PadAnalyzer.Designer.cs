@@ -188,7 +188,7 @@
             tablePresentationComboBox.Items.AddRange(installs);
             tablePresentationComboBox.Text = "Class field data";
             tablePresentationComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            tablePresentationComboBox.SelectedIndexChanged += new System.EventHandler(tablePresentationComboBox_ItemChanged);
+            tablePresentationComboBox.SelectionChangeCommitted += new System.EventHandler(tablePresentationComboBox_ItemChanged);
             tablePresentationComboBox.Enabled = true;
 
             // 

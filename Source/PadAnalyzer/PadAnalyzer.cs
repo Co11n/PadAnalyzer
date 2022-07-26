@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 
 
@@ -152,6 +151,7 @@ namespace PadAnalyzer
                 columnNames["Symbol"] = System.Type.GetType("System.String");
                 columnNames["Size"] = System.Type.GetType("System.Int32");
                 columnNames["Type"] = System.Type.GetType("System.String");
+                columnNames["Object file"] = System.Type.GetType("System.String");
             }
             else
             {
@@ -200,28 +200,7 @@ namespace PadAnalyzer
                 TryAddSymbol(typeId);
             }
 
-            /*
-            IDiaEnumSymbols allSymbols;
-            m_session.findChildren(m_session.globalScope, SymTagEnum.SymTagUDT, null, 0, out allSymbols);
 
-            ulong cacheLineSize = GetCacheLineSize();
-
-            nSymbols = allSymbols.Count;
-            symIdx = 0;
-            symStep = nSymbols / progressBar.Maximum;
-
-            foreach (IDiaSymbol sym in allSymbols)
-            {
-                symIdx++;
-
-                if (symIdx % symStep == 0)
-                {
-                    bgWorker.ReportProgress(symIdx * progressBar.Maximum / nSymbols);
-                }
-
-                TryAddSymbol(sym);
-            }
-            */
         }
 
         SymbolInfo TryAddSymbol(uint typeId)
@@ -573,6 +552,25 @@ namespace PadAnalyzer
             return this.bgWorkerTableData.IsBusy || bgWorker.IsBusy;
         }
 
+        private class SymbolAddressComparator : IComparer<Tuple<string, uint, ulong>>
+        {
+            public int Compare(Tuple<string, uint, ulong> a, Tuple<string, uint, ulong> b)
+            {
+                if (a.Item2 > b.Item2)
+                {
+                    return 1;
+                }
+                else if (a.Item2 < b.Item2)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        } 
+
         private void FillDataTable(object sender, TableViewTypes selectedTableView)
         {
             BackgroundWorker worker = sender as BackgroundWorker;
@@ -648,27 +646,44 @@ namespace PadAnalyzer
             }
             else if (selectedTableView == TableViewTypes.GlobalStaticData)
             {
-                uint globalScopeTypeId = sym.GetGlobalScope();
-                string[] globalSyms = sym.GetTypeFieldNames(globalScopeTypeId);
+                List<Tuple<string, uint, uint>> globalVariableList = sym.GetGlobalVariablesInfo();
+                List<Tuple<string, uint, ulong>> sectionContribInfo = sym.GetSectionsContribInfoList();
+                int sectionContribIndex = -1;
 
-                foreach (string symName in globalSyms)
+                SymbolAddressComparator symAddressCompare = new SymbolAddressComparator();
+
+                foreach (var (variableName, variableRelativeVirtualAddress, variableTypeId) in globalVariableList)
                 {
-                    Tuple<uint, int> globalSymInfo = sym.GetTypeFieldTypeAndOffset(globalScopeTypeId, symName);
-                    uint globalSymTypeId = globalSymInfo.Item1;
-                    uint globalSymSize = sym.GetTypeSize(globalSymTypeId);
-                    string globalSymType = sym.GetTypeName(globalSymTypeId);
+                    uint globalSymSize = sym.GetTypeSize(variableTypeId);
+                    string globalSymType = sym.GetTypeName(variableTypeId);
+
+                    Tuple<string, uint,  ulong> searchObject = new Tuple<string, uint, ulong>("", variableRelativeVirtualAddress, 0);
+
+                    sectionContribIndex = sectionContribInfo.BinarySearch(searchObject, symAddressCompare);
+                    sectionContribIndex = (sectionContribIndex < 0) ? (sectionContribIndex ^ (-1)) - 1: sectionContribIndex;
 
                     DataRow row = m_table.NewRow();
 
-                    row["Symbol"] = symName;
+                    row["Symbol"] = variableName;
                     row["Size"] = globalSymSize;
                     row["Type"] = globalSymType;
+                    row["Object file"] = "No object file";
+
+                    if (sectionContribIndex >= 0)
+                    {
+                        ulong endSectionRVA = (ulong)sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
+
+                        if ((ulong)variableRelativeVirtualAddress < endSectionRVA)
+                        {
+                            row["Object file"] = sectionContribInfo[sectionContribIndex].Item1;
+                        }
+                    }
 
                     m_table.Rows.Add(row);
 
                     // Calculate the current progress
                     i++;
-                    progressPercent = (int)((i * 100) / globalSyms.Length);
+                    progressPercent = (int)((i * 100) / globalVariableList.Count);
 
                     if (prevProgressPercent < progressPercent)
                     {

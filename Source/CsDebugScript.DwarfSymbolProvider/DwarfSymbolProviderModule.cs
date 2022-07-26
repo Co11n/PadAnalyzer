@@ -2971,5 +2971,22 @@ namespace CsDebugScript.DwarfSymbolProvider
 
             return $"__unnamed_type_{unnamedTypeId}";
         }
+
+        /// <summary>
+        /// Get list with section information (object file name, relative virtual adderess, section size)  
+        /// </summary>
+        public List<Tuple<string, uint, ulong>> GetSectionsContribInfoList()
+        {
+            return null;
+        }
+
+        /// <summary>
+        /// Get List of global variables symbols
+        /// </summary>
+        /// <returns></returns>
+        public List<Tuple<string, uint, uint>> GetGlobalVariablesInfo()
+        {
+            return null;
+        }
     }
 }

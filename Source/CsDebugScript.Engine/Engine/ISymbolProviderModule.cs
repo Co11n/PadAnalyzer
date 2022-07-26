@@ -37,7 +37,7 @@ namespace CsDebugScript.Engine
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         uint GetTypeSize(uint typeId);
-
+       
         /// <summary>
         /// Gets the type identifier.
         /// </summary>
@@ -229,6 +229,17 @@ namespace CsDebugScript.Engine
         /// Gets path to the symbols file or <c>null</c> if we don't have symbols.
         /// </summary>
         string GetSymbolsPath();
+
+        /// <summary>
+        /// Get list with section information (object file name, relative virtual adderess, section size)  
+        /// </summary>
+        List<Tuple<string, uint, ulong>> GetSectionsContribInfoList();
+
+        /// <summary>
+        /// Get List of global variables symbols
+        /// </summary>
+        /// <returns></returns>
+        List<Tuple<string, uint, uint>> GetGlobalVariablesInfo();
         #endregion
     }
 }

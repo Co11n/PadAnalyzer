@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.IO;
 
 namespace CsDebugScript.Engine.SymbolProviders
 {
@@ -218,8 +219,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="typeId">The type identifier.</param>
         private List<Tuple<string, uint, int>> GetTypeFields(uint typeId)
         {
-            var type = GetTypeFromId(typeId);
             List<Tuple<string, uint, int>> typeFields = new List<Tuple<string, uint, int>>();
+
+            var type = GetTypeFromId(typeId);
             var fields = type.GetChildren(SymTagEnum.Data);
 
             foreach (var field in fields)
@@ -1439,6 +1441,57 @@ namespace CsDebugScript.Engine.SymbolProviders
                     throw new AggregateException(ex);
                 }
             }
+        }
+
+        /// <summary>
+        /// Get list with section information (object file name, relative virtual adderess, section size)  
+        /// </summary>
+        public List<Tuple<string, uint, ulong>> GetSectionsContribInfoList()
+        {
+            List<Tuple<string, uint, ulong>> sectionsContribInfoList = new List<Tuple<string, uint, ulong>>();
+
+            DIA.IDiaEnumSectionContribs sectionContibTable = null;
+
+            foreach (DIA.IDiaTable table in session.getEnumTables())
+            {
+                sectionContibTable = table as DIA.IDiaEnumSectionContribs;
+                
+                if (sectionContibTable != null)
+                {
+                    break;
+                }
+            }
+
+            if (sectionContibTable != null)
+            {
+                foreach (DIA.IDiaSectionContrib sectionContrib in sectionContibTable)
+                {
+                    sectionsContribInfoList.Add(Tuple.Create<string, uint, ulong>(
+                        sectionContrib.compiland.name, sectionContrib.relativeVirtualAddress, sectionContrib.length));
+                }
+            }
+
+            return sectionsContribInfoList;
+        }
+
+        /// <summary>
+        /// Get List of global variables symbols
+        /// </summary>
+        /// <returns></returns>
+        public List<Tuple<string, uint, uint>> GetGlobalVariablesInfo()
+        {
+            List<Tuple<string, uint, uint>> globalVariableList = new List<Tuple<string, uint, uint>>();
+
+            uint globalScopeTypeId = GetGlobalScope();
+            IDiaSymbol type = GetTypeFromId(globalScopeTypeId);
+            IEnumerable<IDiaSymbol> globalVariables = type.GetChildren(SymTagEnum.Data);
+
+            foreach (IDiaSymbol variable in globalVariables)
+            {
+                globalVariableList.Add(Tuple.Create(variable.name, variable.relativeVirtualAddress, variable.typeId));
+            }
+
+            return globalVariableList;
         }
     }
 }

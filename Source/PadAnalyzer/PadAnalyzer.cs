@@ -265,11 +265,6 @@ namespace PadAnalyzer
 
                 for (int i = 0; i < lastChildIndex; ++i)
                 {
-                    if (info.m_name == "sslBINDER<uiDISPLAY_OBJECT>")
-                    {
-                        int abc = 0;
-                    }
-
                     nextChildOffset = info.m_children[i + 1].m_offset;
 
                     if (nextChildOffset == info.m_children[i].m_offset)
@@ -303,11 +298,13 @@ namespace PadAnalyzer
                 }
 
                 // Calculate last padding
+                nextChildOffset = info.m_size;
+
                 if (startSameOffsetSection != -1)
                 {
                     for (int j = startSameOffsetSection; j < info.m_children.Count; j++)
                     {
-                        info.m_children[j].m_padding = (info.m_size - info.m_children[j].m_offset) - info.m_children[j].m_size;
+                        info.m_children[j].m_padding = (nextChildOffset - info.m_children[j].m_offset) - info.m_children[j].m_size;
                         minOffsetIntegralType = Math.Min(minOffsetIntegralType, info.m_padding);
                     }
 
@@ -315,7 +312,7 @@ namespace PadAnalyzer
                 }
                 else
                 {
-                    info.m_children[lastChildIndex].m_padding = (info.m_size - info.m_children[lastChildIndex].m_offset) - info.m_children[lastChildIndex].m_size;
+                    info.m_children[lastChildIndex].m_padding = (nextChildOffset - info.m_children[lastChildIndex].m_offset) - info.m_children[lastChildIndex].m_size;
                     info.m_padding += info.m_children[lastChildIndex].m_padding;
                 }
             }

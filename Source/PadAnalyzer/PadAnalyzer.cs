@@ -51,15 +51,6 @@ namespace PadAnalyzer
 
         class SymbolInfo
         {
-            public void Set(string name, uint type_id, int size, int offset, string type_name)
-            {
-                m_name = name;
-                m_type_id = type_id;
-                m_type_name = type_name;
-                m_size = size;
-                m_offset = offset;
-            }
-
             public bool HasChildren() { return m_children != null; }
             public void AddChild(SymbolInfo child)
             {
@@ -67,6 +58,7 @@ namespace PadAnalyzer
                     m_children = new List<SymbolInfo>();
                 m_children.Add(child);
             }
+
             public bool IsBase()
             {
                 return m_name.IndexOf("Base: ") == 0;
@@ -144,7 +136,7 @@ namespace PadAnalyzer
                 columnNames["Symbol"] = System.Type.GetType("System.String");
                 columnNames["Size"] = System.Type.GetType("System.Int32");
                 columnNames["Padding"] = System.Type.GetType("System.Int32");
-                columnNames["Padding/Size"] = System.Type.GetType("System.Int32");                
+                columnNames["Padding/Size"] = System.Type.GetType("System.Double");                
             }
             else if (tableType == TableViewTypes.ClassStaticData || tableType == TableViewTypes.GlobalStaticData)
             {
@@ -199,8 +191,6 @@ namespace PadAnalyzer
             {
                 TryAddSymbol(typeId);
             }
-
-
         }
 
         SymbolInfo TryAddSymbol(uint typeId)
@@ -247,45 +237,86 @@ namespace PadAnalyzer
             {
                 Tuple<uint, int> fieldTypeAndOffset = sym.GetTypeFieldTypeAndOffset(typeId, fieldName);
 
-                SymbolInfo childInfo;
-                if (ProcessChild(fieldName, fieldTypeAndOffset.Item1, fieldTypeAndOffset.Item2, out childInfo))
+                if (ProcessChild(fieldName, fieldTypeAndOffset.Item1, fieldTypeAndOffset.Item2, out SymbolInfo childInfo))
+                {
                     info.AddChild(childInfo);
+                }
             }
 
             foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
             {
-                SymbolInfo childInfo;
-                if (ProcessBase(baseClass.Item1, baseClass.Item2, out childInfo))
+                if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))
+                {
                     info.AddChild(childInfo);
+                }
             }
-
 
             // Sort children by offset, recalc padding.
             // Sorting is not needed normally (for data fields), but sometimes base class order is wrong.
+            // The padding value for union/other intergar type symbol will be space for next different offset value 
             if (info.HasChildren())
             {
                 info.m_children.Sort(SymbolInfo.CompareOffsets);
-                for (int i = 0; i < info.m_children.Count; ++i)
-                {
-                    SymbolInfo child = info.m_children[i];
-                    int next_ofs;
 
-                    if (i < info.m_children.Count - 1)
+                int startSameOffsetSection = -1;
+                int minOffsetIntegralType = int.MaxValue;
+                int lastChildIndex = info.m_children.Count - 1;
+                int nextChildOffset = 0;
+
+                for (int i = 0; i < lastChildIndex; ++i)
+                {
+                    if (info.m_name == "sslBINDER<uiDISPLAY_OBJECT>")
                     {
-                        next_ofs = info.m_children[i + 1].m_offset;
+                        int abc = 0;
+                    }
+
+                    nextChildOffset = info.m_children[i + 1].m_offset;
+
+                    if (nextChildOffset == info.m_children[i].m_offset)
+                    {
+                        if (startSameOffsetSection == -1)
+                        {
+                            startSameOffsetSection = i;
+                        }
                     }
                     else
                     {
-                        next_ofs = info.m_size;
+                        if (startSameOffsetSection != -1)
+                        {
+                            for (int j = startSameOffsetSection; j < i; j++)
+                            {
+                                info.m_children[j].m_padding = (nextChildOffset - info.m_children[j].m_offset) - info.m_children[j].m_size;
+                                minOffsetIntegralType = Math.Min(minOffsetIntegralType, info.m_padding);
+                            }
+
+                            info.m_padding += minOffsetIntegralType;
+
+                            startSameOffsetSection = -1;
+                            minOffsetIntegralType = int.MaxValue;
+                        }
+                        else
+                        {
+                            info.m_children[i].m_padding = (nextChildOffset - info.m_children[i].m_offset) - info.m_children[i].m_size;
+                            info.m_padding += info.m_children[i].m_padding;                                                      
+                        }
+                    }
+                }
+
+                // Calculate last padding
+                if (startSameOffsetSection != -1)
+                {
+                    for (int j = startSameOffsetSection; j < info.m_children.Count; j++)
+                    {
+                        info.m_children[j].m_padding = (info.m_size - info.m_children[j].m_offset) - info.m_children[j].m_size;
+                        minOffsetIntegralType = Math.Min(minOffsetIntegralType, info.m_padding);
                     }
 
-                    int pad = (next_ofs - (int)child.m_offset) - child.m_size;
-                    if (pad < 0)
-                    {
-                        pad = 0;
-                    }
-                    child.m_padding += pad;
-                    info.m_padding += child.m_padding;
+                    info.m_padding += minOffsetIntegralType;
+                }
+                else
+                {
+                    info.m_children[lastChildIndex].m_padding = (info.m_size - info.m_children[lastChildIndex].m_offset) - info.m_children[lastChildIndex].m_size;
+                    info.m_padding += info.m_children[lastChildIndex].m_padding;
                 }
             }
         }
@@ -380,8 +411,6 @@ namespace PadAnalyzer
 
         void ShowSelectedSymbolInfo()
         {
-            dataGridViewSymbolInfo.Rows.Clear();
-
             SymbolInfo info = FindSelectedSymbolInfo();
 
             if (info != null)
@@ -402,16 +431,26 @@ namespace PadAnalyzer
         void ShowSymbolInfo(SymbolInfo info)
         {
             dataGridViewSymbolInfo.Rows.Clear();
+
             if (!info.HasChildren())
+            {
                 return;
+            }
 
             long cacheLineSize = (long)GetCacheLineSize();
             long prevCacheBoundaryOffset = m_prefetchStartOffset;
 
             if (prevCacheBoundaryOffset > (long)info.m_size)
+            {
                 prevCacheBoundaryOffset = (long)info.m_size;
+            }
 
             long numCacheLines = 0;
+
+            int currentMemberOffset = 0;
+            int currentMemberSize = 0;
+            int currentMemberPadding = 0;
+
             foreach (SymbolInfo child in info.m_children)
             {
                 if (cacheLineSize > 0)
@@ -426,15 +465,39 @@ namespace PadAnalyzer
                     }
                 }
 
+                // Check for union members or members that could be in integrated data types
+                if (currentMemberOffset == child.m_offset)
+                {
+                    if (child.m_size > currentMemberSize)
+                    {
+                        currentMemberSize = child.m_size;
+                        currentMemberPadding = child.m_padding;
+                    }
+                }
+                else
+                {
+                    if (currentMemberPadding > 0)
+                    {
+                        long paddingOffset = currentMemberOffset + currentMemberSize;
+                        string[] paddingRow = { "Padding", paddingOffset.ToString(), currentMemberPadding.ToString(), "" };
+                        dataGridViewSymbolInfo.Rows.Add(paddingRow);
+                    }
+
+                    currentMemberOffset = child.m_offset;
+                    currentMemberPadding = child.m_padding;
+                    currentMemberSize = child.m_size;
+                }
+
                 string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_type_name };
                 dataGridViewSymbolInfo.Rows.Add(row);
+            }
 
-                if (child.m_padding > 0)
-                {
-                    long paddingOffset = child.m_offset + child.m_size;
-                    string[] paddingRow = { "Padding", paddingOffset.ToString(), child.m_padding.ToString(), "" };
-                    dataGridViewSymbolInfo.Rows.Add(paddingRow);
-                }
+            // Add last offset
+            if (currentMemberPadding > 0)
+            {
+                long paddingOffset = currentMemberOffset + currentMemberSize;
+                string[] paddingRow = { "Padding", paddingOffset.ToString(), currentMemberPadding.ToString(), "" };
+                dataGridViewSymbolInfo.Rows.Add(paddingRow);
             }
         }
 

@@ -1197,24 +1197,15 @@ namespace CsDebugScript.Engine.SymbolProviders
             return FixStaFailure(() =>
             {
                 var type = GetTypeFromId(typeId);
-
-                if (type.symTag == SymTagEnum.PointerType)
-                {
-                    //type = type.type;
-                }
-
-                var bases = type.GetBaseClasses();
                 var result = new Dictionary<string, Tuple<uint, int>>();
 
-                foreach (var b in bases.Reverse())
+                foreach (var b in type.GetBaseClasses().Reverse())
                 {
                     int offset = b.virtualBaseClass ? int.MinValue : b.offset;
 
-                    uint btypeId;
-
-                    if (TryGetTypeId(b.name, out btypeId))
+                    if (TryGetTypeId(b.name, out uint btypeId))
                     {
-                        result.Add(b.name, Tuple.Create(btypeId, offset));
+                        result.Add(b.name, Tuple.Create(btypeId, b.offset));
                     }
                 }
 

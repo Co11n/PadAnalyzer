@@ -221,6 +221,12 @@ namespace CsDebugScript.Engine
         bool HasTypeVTable(uint typeId);
 
         /// <summary>
+        /// Get the pointer of VTable type
+        /// </summary>
+        /// <returns></returns>
+        ulong GetPointerVTableSize(uint typeId);
+
+        /// <summary>
         /// Gets the global scope type id.
         /// </summary>
         uint GetGlobalScope();

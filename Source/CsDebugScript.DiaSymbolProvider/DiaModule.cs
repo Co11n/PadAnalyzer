@@ -1484,5 +1484,11 @@ namespace CsDebugScript.Engine.SymbolProviders
 
             return globalVariableList;
         }
+
+        /// <summary>
+        /// Get the pointer of VTable type
+        /// </summary>
+        /// <returns></returns>
+        public ulong GetPointerVTableSize(uint typeId) { return 0; }
     }
 }

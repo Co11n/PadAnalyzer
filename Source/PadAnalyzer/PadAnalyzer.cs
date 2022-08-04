@@ -41,6 +41,176 @@ namespace PadAnalyzer
             GlobalStaticData
         };
 
+        class PaddingCalculation
+        {
+            private SymbolInfo symOfType = null;
+            private List<Tuple<int, int>> paddingList = new List<Tuple<int, int>>();
+
+            private int currentIndex = 0;
+            private SymbolInfo currentChild = null;
+            private int nextChildOffset = 0;
+            private int unnamedUnionStartIndex = -1;
+
+            private void UpdateChildState(int i)
+            {
+                currentIndex = i;
+
+                currentChild = symOfType.m_children[currentIndex];
+                nextChildOffset = symOfType.m_children[i + 1].m_offset;
+            }
+
+            private void SetFinalState()
+            {
+                currentIndex = symOfType.m_children.Count - 1;
+
+                currentChild = symOfType.m_children[currentIndex];
+                nextChildOffset = (int)symOfType.m_size;
+            }
+
+            private void CalculatePaddingForBaseClass()
+            {
+                int realChildSize = nextChildOffset - currentChild.m_offset;
+
+                if (realChildSize <= currentChild.m_size)
+                {
+                    currentChild.m_size = realChildSize;
+                    currentChild.m_padding = 0;
+                }
+                else
+                {
+                    currentChild.m_padding = realChildSize - currentChild.m_size;
+                }
+
+                symOfType.m_padding += currentChild.m_padding;
+            }
+
+            private class PaddingOffsetComparer : IComparer<Tuple<int, int>>
+            {
+                public int Compare(Tuple<int, int> x, Tuple<int, int> y)
+                {
+                    if (x.Item1 > y.Item1)
+                    {
+                        return 1;
+                    }
+
+                    return -1;                    
+                }
+            }
+
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <param name="info"></param>
+            /// <param name="currentChild"></param>
+            private void CalculateChildPadding()
+            {
+                if (currentChild.IsBase())
+                {
+                    CalculatePaddingForBaseClass();
+                }
+                else
+                {
+                    if (currentChild.m_offset >= nextChildOffset)
+                    {
+                        if (unnamedUnionStartIndex == -1)
+                        {
+                            unnamedUnionStartIndex = currentIndex;
+                        }
+                    }
+                    else
+                    {
+                        currentChild.m_padding = (nextChildOffset - currentChild.m_offset) - currentChild.m_size;
+
+                        if (currentChild.m_padding > 0)
+                        {
+                            int paddingStartOffset = currentChild.m_offset + currentChild.m_size;
+
+                            paddingList.Add(Tuple.Create(paddingStartOffset, paddingStartOffset + currentChild.m_padding));
+                        }
+                    }
+                }
+            }
+
+            private void CorrectUnnamedUnionPaddingCalculation()
+            {
+                if (unnamedUnionStartIndex != -1)
+                {
+                    PaddingOffsetComparer paddingOffsetComparer = new PaddingOffsetComparer();
+                    paddingList.Sort(paddingOffsetComparer);
+
+                    int offsetIndex;
+                    Tuple<int, int> dymmySearchObject = null;
+                    int boundFieldOffset;
+
+                    for (int i = unnamedUnionStartIndex; i < symOfType.m_children.Count; ++i)
+                    {
+                        dymmySearchObject = Tuple.Create(symOfType.m_children[i].m_offset, 0);
+
+                        offsetIndex = paddingList.BinarySearch(dymmySearchObject, paddingOffsetComparer);
+                        offsetIndex = (offsetIndex < 0) ? ~offsetIndex : offsetIndex;
+
+                        boundFieldOffset = symOfType.m_children[i].m_offset + symOfType.m_children[i].m_size;
+                        int cnt = paddingList.Count;
+
+                        for (int j = offsetIndex; j < cnt; ++j)
+                        {
+                            if (paddingList[j].Item2 < boundFieldOffset)
+                            {
+                                paddingList.RemoveAt(j);
+                                cnt--;
+                            }
+                            else
+                            {
+                                if (paddingList[j].Item1 < boundFieldOffset)
+                                {
+                                    paddingList[j] = Tuple.Create(boundFieldOffset, paddingList[j].Item2);
+                                }
+                            }
+                        }
+
+                    }
+                }
+
+                for (int i = 0; i < paddingList.Count; ++i)
+                {
+                    symOfType.m_padding += (paddingList[i].Item2 - paddingList[i].Item1);
+                }
+            }
+
+            public void Initialize(SymbolInfo inSym)
+            {
+                symOfType = inSym;
+                currentIndex = 0;
+            }
+
+            public void Run()
+            {
+                int lastChildIndex = symOfType.m_children.Count - 1;
+
+                if (symOfType.m_name == "osJOB_MNG")
+                {
+                    int a = 0;
+                }
+
+                if (symOfType.m_name == "dsRAW_TYPE_EX<rendTERRAIN_OVERLAYS_PER_TILE_LISTS,1048640,8>")
+                {
+                    int a = 1;
+                }
+
+                for (int i = 0; i < lastChildIndex; ++i)
+                {
+                    UpdateChildState(i);
+                    CalculateChildPadding();
+                }
+
+                SetFinalState();
+                CalculateChildPadding();
+
+                CorrectUnnamedUnionPaddingCalculation();
+            }
+
+        }
+
         Dictionary<string, TableViewTypes> dictViewTableTypes =
             new Dictionary<string, TableViewTypes>()
         {
@@ -55,7 +225,10 @@ namespace PadAnalyzer
             public void AddChild(SymbolInfo child)
             {
                 if (m_children == null)
+                {
                     m_children = new List<SymbolInfo>();
+                }
+
                 m_children.Add(child);
             }
 
@@ -79,9 +252,11 @@ namespace PadAnalyzer
             public string m_name;
             public uint m_type_id;
             public string m_type_name;
-            public int m_size;
+
             public int m_offset;
+            public int m_size;
             public int m_padding = 0;
+
             public List<SymbolInfo> m_children;
         };
 
@@ -195,23 +370,26 @@ namespace PadAnalyzer
 
         SymbolInfo TryAddSymbol(uint typeId)
         {
-            string name = sym.GetTypeName(typeId);
             uint size = sym.GetTypeSize(typeId);
 
-            if (size > 0 && name != null)
+            if (size > 0)
             {
-                if (!m_symbols.ContainsKey(name))
+                string typeName = sym.GetTypeName(typeId);
+
+                if (!m_symbols.ContainsKey(typeName))
                 {
                     SymbolInfo info = new SymbolInfo()
                     {
-                        m_name = name,
+                        m_name = typeName,
                         m_type_id = typeId,
                         m_type_name = "",
-                        m_size = (int)size,
+
                         m_offset = 0,
+                        m_size = (int)size,
+                        m_padding = 0,
                     };
 
-                    m_symbols.Add(info.m_name, info);
+                    m_symbols[info.m_name] = info;
 
                     ProcessChildren(info, typeId);
 
@@ -219,7 +397,7 @@ namespace PadAnalyzer
                 }
                 else
                 {
-                    return m_symbols[name];
+                    return m_symbols[typeName];
                 }
             }
 
@@ -233,6 +411,31 @@ namespace PadAnalyzer
 
         void ProcessChildren(SymbolInfo info, uint typeId)
         {
+            //if (sym.HasTypeVTable(typeId))
+            //{
+            //SymbolInfo virtualAddressPointer = new SymbolInfo()
+            //{
+            //m_name = "VTable",
+            //m_offset = 0,
+            //m_size = 8
+            //};
+
+            //info.AddChild(virtualAddressPointer);
+            //}
+
+            foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
+            {
+                if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))
+                {
+                    info.AddChild(childInfo);
+                }
+            }
+
+            if (info.HasChildren())
+            {
+                info.m_children.Sort(SymbolInfo.CompareOffsets);
+            }
+
             foreach (string fieldName in sym.GetTypeFieldNames(typeId))
             {
                 Tuple<uint, int> fieldTypeAndOffset = sym.GetTypeFieldTypeAndOffset(typeId, fieldName);
@@ -243,85 +446,32 @@ namespace PadAnalyzer
                 }
             }
 
-            foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
-            {
-                if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))
-                {
-                    info.AddChild(childInfo);
-                }
-            }
-
             // Sort children by offset, recalc padding.
             // Sorting is not needed normally (for data fields), but sometimes base class order is wrong.
             // The padding value for union/other intergar type symbol will be space for next different offset value 
             if (info.HasChildren())
             {
-                info.m_children.Sort(SymbolInfo.CompareOffsets);
-
-                int startSameOffsetSection = -1;
-                int minOffsetIntegralType = int.MaxValue;
-                int lastChildIndex = info.m_children.Count - 1;
-                int nextChildOffset = 0;
-
-                for (int i = 0; i < lastChildIndex; ++i)
+                if (sym.GetTypeTag(info.m_type_id) == CsDebugScript.Engine.CodeTypeTag.Enum)
                 {
-                    nextChildOffset = info.m_children[i + 1].m_offset;
-
-                    if (nextChildOffset == info.m_children[i].m_offset)
+                    foreach (SymbolInfo childInfo in info.m_children)
                     {
-                        if (startSameOffsetSection == -1)
-                        {
-                            startSameOffsetSection = i;
-                        }
-                    }
-                    else
-                    {
-                        if (startSameOffsetSection != -1)
-                        {
-                            for (int j = startSameOffsetSection; j < i; j++)
-                            {
-                                info.m_children[j].m_padding = (nextChildOffset - info.m_children[j].m_offset) - info.m_children[j].m_size;
-                                minOffsetIntegralType = Math.Min(minOffsetIntegralType, info.m_padding);
-                            }
-
-                            info.m_padding += minOffsetIntegralType;
-
-                            startSameOffsetSection = -1;
-                            minOffsetIntegralType = int.MaxValue;
-                        }
-                        else
-                        {
-                            info.m_children[i].m_padding = (nextChildOffset - info.m_children[i].m_offset) - info.m_children[i].m_size;
-                            info.m_padding += info.m_children[i].m_padding;                                                      
-                        }
-                    }
-                }
-
-                // Calculate last padding
-                nextChildOffset = info.m_size;
-
-                if (startSameOffsetSection != -1)
-                {
-                    for (int j = startSameOffsetSection; j < info.m_children.Count; j++)
-                    {
-                        info.m_children[j].m_padding = (nextChildOffset - info.m_children[j].m_offset) - info.m_children[j].m_size;
-                        minOffsetIntegralType = Math.Min(minOffsetIntegralType, info.m_padding);
+                        childInfo.m_padding = 0;
                     }
 
-                    info.m_padding += minOffsetIntegralType;
+                    return;
                 }
-                else
-                {
-                    info.m_children[lastChildIndex].m_padding = (nextChildOffset - info.m_children[lastChildIndex].m_offset) - info.m_children[lastChildIndex].m_size;
-                    info.m_padding += info.m_children[lastChildIndex].m_padding;
-                }
+
+                PaddingCalculation processingSymbolState = new PaddingCalculation();
+
+                processingSymbolState.Initialize(info);
+                processingSymbolState.Run();
             }
         }
 
         bool ProcessBase(uint typeId, int memOffset, out SymbolInfo info)
         {
             string typeName = sym.GetTypeName(typeId);
-            ulong typeSize = sym.GetTypeSize(typeId);
+            uint typeSize = sym.GetTypeSize(typeId);
 
             info = new SymbolInfo()
             {
@@ -333,11 +483,10 @@ namespace PadAnalyzer
             };
 
             SymbolInfo typeInfo = TryAddSymbol(typeId);
-            int count = 1;
 
             if (typeInfo != null)
             {
-                info.m_padding += typeInfo.m_padding * count;
+                info.m_padding += typeInfo.m_padding;
             }
 
             return true;
@@ -345,25 +494,18 @@ namespace PadAnalyzer
 
         bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
         {
-            string symbolTypeName = sym.GetTypeName(typeId);
-            ulong len = sym.GetTypeSize(typeId);
-
             info = new SymbolInfo()
             {
                 m_name = fieldName,
                 m_type_id = typeId,
-                m_size = (int)len,
+                m_type_name = sym.GetTypeName(typeId),
+
                 m_offset = memOffset,
-                m_type_name = symbolTypeName
+                m_size = (int)sym.GetTypeSize(typeId),
+                m_padding = 0
             };
 
-            SymbolInfo typeInfo = TryAddSymbol(typeId);
-            int count = 1;
-
-            if (typeInfo != null)
-            {
-                info.m_padding += typeInfo.m_padding * count;
-            }
+            TryAddSymbol(typeId);
 
             return true;
         }

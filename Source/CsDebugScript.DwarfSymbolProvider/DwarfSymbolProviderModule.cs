@@ -1586,6 +1586,12 @@ namespace CsDebugScript.DwarfSymbolProvider
         }
 
         /// <summary>
+        /// Get the pointer of VTable type
+        /// </summary>
+        /// <returns></returns>
+        public ulong GetPointerVTableSize(uint typeId) { return 0; }
+
+        /// <summary>
         /// Gets the global scope.
         /// </summary>
         public uint GetGlobalScope()

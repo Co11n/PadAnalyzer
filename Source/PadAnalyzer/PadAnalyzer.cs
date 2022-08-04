@@ -43,30 +43,41 @@ namespace PadAnalyzer
 
         class PaddingCalculation
         {
-            private SymbolInfo symOfType = null;
-            private List<Tuple<int, int>> paddingList = new List<Tuple<int, int>>();
+            private SymbolInfo typeSymbol = null;
 
-            private int currentIndex = 0;
             private SymbolInfo currentChild = null;
+            private int currentIndex = 0;
             private int nextChildOffset = 0;
             private int unnamedUnionStartIndex = -1;
 
+            private List<Tuple<int, int>> paddingList = new List<Tuple<int, int>>();
+
+            /// <summary>
+            /// Update Child State with i child
+            /// </summary>
+            /// <param name="i"></param>
             private void UpdateChildState(int i)
             {
                 currentIndex = i;
 
-                currentChild = symOfType.m_children[currentIndex];
-                nextChildOffset = symOfType.m_children[i + 1].m_offset;
+                currentChild = typeSymbol.m_children[currentIndex];
+                nextChildOffset = typeSymbol.m_children[i + 1].m_offset;
             }
 
+            /// <summary>
+            /// Sets the final child and the next child offset as type size
+            /// </summary>
             private void SetFinalState()
             {
-                currentIndex = symOfType.m_children.Count - 1;
+                currentIndex = typeSymbol.m_children.Count - 1;
 
-                currentChild = symOfType.m_children[currentIndex];
-                nextChildOffset = (int)symOfType.m_size;
+                currentChild = typeSymbol.m_children[currentIndex];
+                nextChildOffset = (int)typeSymbol.m_size;
             }
 
+            /// <summary>
+            /// Calculate padding for base class
+            /// </summary>
             private void CalculatePaddingForBaseClass()
             {
                 int realChildSize = nextChildOffset - currentChild.m_offset;
@@ -81,9 +92,12 @@ namespace PadAnalyzer
                     currentChild.m_padding = realChildSize - currentChild.m_size;
                 }
 
-                symOfType.m_padding += currentChild.m_padding;
+                typeSymbol.m_padding += currentChild.m_padding;
             }
 
+            /// <summary>
+            /// The class for compare padding tupples
+            /// </summary>
             private class PaddingOffsetComparer : IComparer<Tuple<int, int>>
             {
                 public int Compare(Tuple<int, int> x, Tuple<int, int> y)
@@ -98,7 +112,7 @@ namespace PadAnalyzer
             }
 
             /// <summary>
-            /// 
+            /// Calculated padding of current child
             /// </summary>
             /// <param name="info"></param>
             /// <param name="currentChild"></param>
@@ -131,7 +145,10 @@ namespace PadAnalyzer
                 }
             }
 
-            private void CorrectUnnamedUnionPaddingCalculation()
+            /// <summary>
+            /// Calculates the padding of typeSymbol
+            /// </summary>
+            private void CorrectPaddingCalculation()
             {
                 if (unnamedUnionStartIndex != -1)
                 {
@@ -142,14 +159,14 @@ namespace PadAnalyzer
                     Tuple<int, int> dymmySearchObject = null;
                     int boundFieldOffset;
 
-                    for (int i = unnamedUnionStartIndex; i < symOfType.m_children.Count; ++i)
+                    for (int i = unnamedUnionStartIndex; i < typeSymbol.m_children.Count; ++i)
                     {
-                        dymmySearchObject = Tuple.Create(symOfType.m_children[i].m_offset, 0);
+                        dymmySearchObject = Tuple.Create(typeSymbol.m_children[i].m_offset, 0);
 
                         offsetIndex = paddingList.BinarySearch(dymmySearchObject, paddingOffsetComparer);
                         offsetIndex = (offsetIndex < 0) ? ~offsetIndex : offsetIndex;
 
-                        boundFieldOffset = symOfType.m_children[i].m_offset + symOfType.m_children[i].m_size;
+                        boundFieldOffset = typeSymbol.m_children[i].m_offset + typeSymbol.m_children[i].m_size;
                         int cnt = paddingList.Count;
 
                         for (int j = offsetIndex; j < cnt; ++j)
@@ -173,29 +190,26 @@ namespace PadAnalyzer
 
                 for (int i = 0; i < paddingList.Count; ++i)
                 {
-                    symOfType.m_padding += (paddingList[i].Item2 - paddingList[i].Item1);
+                    typeSymbol.m_padding += (paddingList[i].Item2 - paddingList[i].Item1);
                 }
             }
 
+            /// <summary>
+            /// Initialize the PaddingCalculation class with symbol type
+            /// </summary>
+            /// <param name="inSym"></param>
             public void Initialize(SymbolInfo inSym)
             {
-                symOfType = inSym;
+                typeSymbol = inSym;
                 currentIndex = 0;
             }
 
+            /// <summary>
+            /// Runs the paddings calculations for typeSymbol children
+            /// </summary>
             public void Run()
             {
-                int lastChildIndex = symOfType.m_children.Count - 1;
-
-                if (symOfType.m_name == "osJOB_MNG")
-                {
-                    int a = 0;
-                }
-
-                if (symOfType.m_name == "dsRAW_TYPE_EX<rendTERRAIN_OVERLAYS_PER_TILE_LISTS,1048640,8>")
-                {
-                    int a = 1;
-                }
+                int lastChildIndex = typeSymbol.m_children.Count - 1;
 
                 for (int i = 0; i < lastChildIndex; ++i)
                 {
@@ -206,7 +220,7 @@ namespace PadAnalyzer
                 SetFinalState();
                 CalculateChildPadding();
 
-                CorrectUnnamedUnionPaddingCalculation();
+                CorrectPaddingCalculation();
             }
 
         }
@@ -276,6 +290,7 @@ namespace PadAnalyzer
         }
 
         String currentFileName;
+
         private void loadPDBToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (IsDataTableBusy())
@@ -873,11 +888,12 @@ namespace PadAnalyzer
 
                     if (sectionContribIndex >= 0)
                     {
-                        ulong endSectionRVA = (ulong)sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
+                        ulong endSectionRVA = sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
 
-                        if ((ulong)variableRelativeVirtualAddress < endSectionRVA)
+                        if (variableRelativeVirtualAddress < endSectionRVA)
                         {
-                            row["Object file"] = sectionContribInfo[sectionContribIndex].Item1;
+                            string objectFileName = System.IO.Path.GetFileName(sectionContribInfo[sectionContribIndex].Item1);
+                            row["Object file"] = objectFileName;
                         }
                     }
 

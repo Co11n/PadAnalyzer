@@ -361,10 +361,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="typeName">Name of the type.</param>
         public uint GetTypeId(string typeName)
         {
-            uint typeId;
-
-            if (!TryGetTypeId(typeName, out typeId))
+            if (!TryGetTypeId(typeName, out uint typeId))
                 throw new Exception($"Type name not found: {typeName}");
+
             return typeId;
         }
 

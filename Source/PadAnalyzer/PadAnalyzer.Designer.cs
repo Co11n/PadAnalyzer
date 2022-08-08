@@ -356,6 +356,7 @@
             this.ResumeLayout(false);
             this.PerformLayout();
             this.Resize += new System.EventHandler(this.SetColumnSizeEquel);
+            this.Load += new System.EventHandler(this.SetColumnSizeEquel);
         }
 
         #endregion

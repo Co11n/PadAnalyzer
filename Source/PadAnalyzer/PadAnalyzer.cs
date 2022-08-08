@@ -223,7 +223,7 @@ namespace PadAnalyzer
         /// <summary>
         /// 
         /// </summary>
-        private void SetColumnSizeEquel(object sender, System.EventArgs e)
+        private void SetColumnSizeEquel(object sender, EventArgs e)
         {
             for (int i = 0; i < dataGridSymbols.Columns.Count; ++i)
             {

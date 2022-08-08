@@ -428,18 +428,6 @@ namespace PadAnalyzer
 
         void ProcessChildren(SymbolInfo info, uint typeId)
         {
-            //if (sym.HasTypeVTable(typeId))
-            //{
-            //SymbolInfo virtualAddressPointer = new SymbolInfo()
-            //{
-            //m_name = "VTable",
-            //m_offset = 0,
-            //m_size = 8
-            //};
-
-            //info.AddChild(virtualAddressPointer);
-            //}
-
             foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
             {
                 if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))

@@ -17,11 +17,6 @@ namespace PadAnalyzer
             ResetDataTable();
             CreateDataTableColumns(m_table, TableViewTypes.ClassFieldData);
             
-            dataGridSymbols.DataSource = bindingSourceSymbols;
-
-            dataGridSymbols.Columns[0].Width = 271;
-            progressBar.Maximum = progressBar.Width;
-
             string[] arguments = Environment.GetCommandLineArgs();
 
             if (arguments.Length == 2)
@@ -225,6 +220,22 @@ namespace PadAnalyzer
 
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        private void SetColumnSizeEquel(object sender, System.EventArgs e)
+        {
+            for (int i = 0; i < dataGridSymbols.Columns.Count; ++i)
+            {
+                dataGridSymbols.Columns[i].Width = dataGridSymbols.Width / dataGridSymbols.Columns.Count;
+            }
+
+            for (int i = 0; i < dataGridViewSymbolInfo.Columns.Count; ++i)
+            {
+                dataGridViewSymbolInfo.Columns[i].Width = dataGridViewSymbolInfo.Width / dataGridViewSymbolInfo.Columns.Count;
+            }
+        }
+
         Dictionary<string, TableViewTypes> dictViewTableTypes =
             new Dictionary<string, TableViewTypes>()
         {
@@ -323,17 +334,17 @@ namespace PadAnalyzer
             
             if (tableType == TableViewTypes.ClassFieldData)
             {
-                columnNames["Symbol"] = System.Type.GetType("System.String");
-                columnNames["Size"] = System.Type.GetType("System.Int32");
-                columnNames["Padding"] = System.Type.GetType("System.Int32");
-                columnNames["Padding/Size"] = System.Type.GetType("System.Double");                
+                columnNames["Symbol"] = Type.GetType("System.String");
+                columnNames["Size"] = Type.GetType("System.Int32");
+                columnNames["Padding"] = Type.GetType("System.Int32");
+                columnNames["Padding/Size"] = Type.GetType("System.Double");                
             }
             else if (tableType == TableViewTypes.ClassStaticData || tableType == TableViewTypes.GlobalStaticData)
             {
-                columnNames["Symbol"] = System.Type.GetType("System.String");
-                columnNames["Size"] = System.Type.GetType("System.Int32");
-                columnNames["Type"] = System.Type.GetType("System.String");
-                columnNames["Object file"] = System.Type.GetType("System.String");
+                columnNames["Symbol"] = Type.GetType("System.String");
+                columnNames["Size"] = Type.GetType("System.Int32");
+                columnNames["Type"] = Type.GetType("System.String");
+                columnNames["Object file"] = Type.GetType("System.String");
             }
             else
             {
@@ -366,15 +377,6 @@ namespace PadAnalyzer
             {
                 CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider dw = new CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider();
                 sym = dw.LoadModule(fileName);
-            }
-
-            try
-            {
-            }
-            catch (System.Runtime.InteropServices.COMException exc)
-            {
-                MessageBox.Show(this, exc.ToString());
-                return;
             }
 
             foreach (uint typeId in sym.GetAllTypes())

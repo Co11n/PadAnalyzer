@@ -556,10 +556,17 @@ namespace PadAnalyzer
             ShowSelectedSymbolInfo();
         }
 
-        void ShowSelectedSymbolInfo()
+        private TableViewTypes GetViewType()
+        {
+            return dictViewTableTypes[tablePresentationComboBox.Text];
+        }
+
+        private void ShowSelectedSymbolInfo()
         {
             SymbolInfo info = null;
-            TableViewTypes selectedTableView = dictViewTableTypes[tablePresentationComboBox.Text];
+
+            TableViewTypes selectedTableView = GetViewType();
+            dataGridViewSymbolInfo.Rows.Clear();
 
             if (selectedTableView == TableViewTypes.ClassFieldData)
             {
@@ -578,8 +585,6 @@ namespace PadAnalyzer
 
         void ShowSymbolInfo(SymbolInfo info)
         {
-            dataGridViewSymbolInfo.Rows.Clear();
-
             if (!info.HasChildren())
             {
                 return;
@@ -591,7 +596,6 @@ namespace PadAnalyzer
             long numCacheLines = 0;
             long numCacheLinesBetweenChildren = 0;
             long childEndOffset;
-            long cacheLineBound = 0;
             long cacheLineOffset = 0;
             string intersectStatus = "";
 
@@ -617,13 +621,13 @@ namespace PadAnalyzer
                     childEndOffset = child.m_offset + child.m_size + child.m_padding;
 
                     numCacheLinesBetweenChildren = (childEndOffset - prevCacheBoundaryOffset) / cacheLineSize;
-                    numCacheLines += numCacheLinesBetweenChildren;
 
                     if (numCacheLinesBetweenChildren > 0)
                     {
-                        cacheLineBound = numCacheLines * cacheLineSize;
+                        numCacheLines += numCacheLinesBetweenChildren;
+                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
 
-                        if (cacheLineBound != childEndOffset)
+                        if (cacheLineOffset != childEndOffset)
                         {
                             intersectStatus = string.Format("Intesects cacheline: {0}", child.m_name);
                         }
@@ -631,8 +635,6 @@ namespace PadAnalyzer
                         {
                             intersectStatus = "";
                         }
-
-                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
 
                         string cacheInfo = string.Format("{0}x{1}", numCacheLinesBetweenChildren, cacheLineSize);
                         string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), cacheInfo, intersectStatus };
@@ -646,8 +648,7 @@ namespace PadAnalyzer
 
         void ShowSymbolStaticInfo(SymbolInfo info)
         {
-            // Nothing to show at the moment
-            dataGridViewSymbolInfo.Rows.Clear();            
+            // Nothing to show at the moment         
         }
 
         private void DataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
@@ -941,7 +942,7 @@ namespace PadAnalyzer
         private void TablePresentationComboBox_ItemChanged(object sender, EventArgs e)
         {
             ComboBox viewTablecomboBox = (ComboBox)sender;
-            TableViewTypes selectedTableView = dictViewTableTypes[tablePresentationComboBox.Text];
+            TableViewTypes selectedTableView = GetViewType();
 
             if (IsDataTableBusy())
             {

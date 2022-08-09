@@ -385,7 +385,7 @@ namespace PadAnalyzer
             }
         }
 
-        SymbolInfo TryAddSymbol(uint typeId)
+        private SymbolInfo TryAddSymbol(uint typeId)
         {
             uint size = sym.GetTypeSize(typeId);
 
@@ -426,7 +426,7 @@ namespace PadAnalyzer
             return Convert.ToUInt32(textBoxCache.Text);
         }
 
-        void ProcessChildren(SymbolInfo info, uint typeId)
+        private void ProcessChildren(SymbolInfo info, uint typeId)
         {
             foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
             {
@@ -473,7 +473,7 @@ namespace PadAnalyzer
             }
         }
 
-        bool ProcessBase(uint typeId, int memOffset, out SymbolInfo info)
+        private bool ProcessBase(uint typeId, int memOffset, out SymbolInfo info)
         {
             string typeName = sym.GetTypeName(typeId);
             uint typeSize = sym.GetTypeSize(typeId);
@@ -497,7 +497,7 @@ namespace PadAnalyzer
             return true;
         }
 
-        bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
+        private bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
         {
             info = new SymbolInfo()
             {
@@ -515,7 +515,7 @@ namespace PadAnalyzer
             return true;
         }
 
-        SymbolInfo FindSelectedSymbolInfo()
+        private SymbolInfo FindSelectedSymbolInfo()
         {
             if (dataGridSymbols.SelectedRows.Count == 0)
                 return null;
@@ -527,7 +527,7 @@ namespace PadAnalyzer
             return info;
         }
 
-        SymbolInfo FindSymbolInfo(string name)
+        private SymbolInfo FindSymbolInfo(string name)
         {
             SymbolInfo info;
             m_symbols.TryGetValue(name, out info);
@@ -584,12 +584,10 @@ namespace PadAnalyzer
             long cacheLineSize = (long)GetCacheLineSize();
             long prevCacheBoundaryOffset = m_prefetchStartOffset;
 
-            if (prevCacheBoundaryOffset > (long)info.m_size)
-            {
-                prevCacheBoundaryOffset = (long)info.m_size;
-            }
+            prevCacheBoundaryOffset = Math.Min(prevCacheBoundaryOffset, info.m_size);
 
             long numCacheLines = 0;
+            long numCacheLinesBetweenChildren = 0;
 
             int currentMemberOffset = 0;
             int currentMemberSize = 0;
@@ -599,12 +597,19 @@ namespace PadAnalyzer
             {
                 if (cacheLineSize > 0)
                 {
-                    while (child.m_offset - prevCacheBoundaryOffset >= cacheLineSize)
+                    long cacheLineOffset = 0;
+
+                    numCacheLinesBetweenChildren = (child.m_offset - prevCacheBoundaryOffset) / cacheLineSize;
+
+                    if (numCacheLinesBetweenChildren > 0)
                     {
-                        numCacheLines = numCacheLines + 1;
-                        long cacheLineOffset = numCacheLines * cacheLineSize + m_prefetchStartOffset;
-                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), "", "" };
+                        numCacheLines += numCacheLinesBetweenChildren;
+                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
+
+                        string cacheInfo = string.Format("{0}x{1}", numCacheLinesBetweenChildren, cacheLineSize);
+                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), cacheInfo, "" };
                         dataGridViewSymbolInfo.Rows.Add(boundaryRow);
+                        
                         prevCacheBoundaryOffset = cacheLineOffset;
                     }
                 }
@@ -665,6 +670,7 @@ namespace PadAnalyzer
             foreach (DataGridViewRow row in dataGridViewSymbolInfo.Rows)
             {
                 DataGridViewCell cell = row.Cells[0];
+
                 if (cell.Value.ToString().StartsWith("Padding"))
                 {
                     cell.Style.BackColor = Color.LightGray;
@@ -677,7 +683,7 @@ namespace PadAnalyzer
                     row.Cells[1].Style.BackColor = Color.LightGreen;
                     row.Cells[2].Style.BackColor = Color.LightGreen;
                 }
-                else if (cell.Value.ToString() == "Cacheline boundary")
+                else if (cell.Value.ToString().IndexOf("Cacheline boundary") >= 0)
                 {
                     cell.Style.BackColor = Color.LightPink;
                     row.Cells[1].Style.BackColor = Color.LightPink;
@@ -686,12 +692,27 @@ namespace PadAnalyzer
             }
         }
 
-        private void textBoxFilter_TextChanged(object sender, EventArgs e)
+        private void UseFilter(object sender, EventArgs e)
         {
             if (textBoxFilter.Text.Length == 0)
+            {
                 bindingSourceSymbols.Filter = null;
+            }
             else
-                bindingSourceSymbols.Filter = "Symbol LIKE '*" + textBoxFilter.Text + "*'";
+            {
+                string filterToUse = null;
+
+                if (exactSearch.Checked)
+                {
+                    filterToUse = "Symbol = " + '\'' +  textBoxFilter.Text + '\'';
+                }
+                else
+                {
+                    filterToUse = "Symbol LIKE '*" + textBoxFilter.Text + "*'";
+                }
+                    
+                bindingSourceSymbols.Filter = filterToUse;
+            }
         }
 
         void dumpSymbolInfo(System.IO.TextWriter tw, SymbolInfo info)
@@ -959,10 +980,8 @@ namespace PadAnalyzer
 
         private void bgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            //
-            // Sort by name by default (ascending)
             dataGridSymbols.Sort(dataGridSymbols.Columns[0], ListSortDirection.Ascending);
-            bindingSourceSymbols.Filter = null;// "Symbol LIKE '*rde*'";
+            bindingSourceSymbols.Filter = null;
 
             ShowSelectedSymbolInfo();
 

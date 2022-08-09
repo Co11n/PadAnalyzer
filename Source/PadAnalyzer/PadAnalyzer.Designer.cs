@@ -37,6 +37,7 @@
             this.openPdbDialog = new System.Windows.Forms.OpenFileDialog();
             this.bindingSourceSymbols = new System.Windows.Forms.BindingSource(this.components);
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+            this.label3 = new System.Windows.Forms.Label();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.textBoxCache = new System.Windows.Forms.MaskedTextBox();
             this.label2 = new System.Windows.Forms.Label();
@@ -44,6 +45,7 @@
             this.ProgressLabel = new System.Windows.Forms.Label();
             this.textBoxFilter = new System.Windows.Forms.TextBox();
             this.tablePresentationComboBox = new System.Windows.Forms.ComboBox();
+            this.exactSearch = new System.Windows.Forms.CheckBox();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.dataGridSymbols = new System.Windows.Forms.DataGridView();
             this.dataGridViewSymbolInfo = new System.Windows.Forms.DataGridView();
@@ -119,6 +121,7 @@
             // 
             // splitContainer2.Panel1
             // 
+            this.splitContainer2.Panel1.Controls.Add(this.label3);
             this.splitContainer2.Panel1.Controls.Add(this.progressBar);
             this.splitContainer2.Panel1.Controls.Add(this.textBoxCache);
             this.splitContainer2.Panel1.Controls.Add(this.label2);
@@ -126,13 +129,24 @@
             this.splitContainer2.Panel1.Controls.Add(this.ProgressLabel);
             this.splitContainer2.Panel1.Controls.Add(this.textBoxFilter);
             this.splitContainer2.Panel1.Controls.Add(this.tablePresentationComboBox);
+            this.splitContainer2.Panel1.Controls.Add(this.exactSearch);
             // 
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.splitContainer1);
             this.splitContainer2.Size = new System.Drawing.Size(1379, 659);
-            this.splitContainer2.SplitterDistance = 52;
+            this.splitContainer2.SplitterDistance = 82;
             this.splitContainer2.TabIndex = 1;
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
+            this.label3.Location = new System.Drawing.Point(12, 34);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(72, 13);
+            this.label3.TabIndex = 6;
+            this.label3.Text = "Exact search:";
             // 
             // progressBar
             // 
@@ -145,7 +159,7 @@
             // textBoxCache
             // 
             this.textBoxCache.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.textBoxCache.Location = new System.Drawing.Point(80, 28);
+            this.textBoxCache.Location = new System.Drawing.Point(85, 55);
             this.textBoxCache.Mask = "0000";
             this.textBoxCache.Name = "textBoxCache";
             this.textBoxCache.Size = new System.Drawing.Size(34, 20);
@@ -158,7 +172,7 @@
             // 
             this.label2.AutoSize = true;
             this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.label2.Location = new System.Drawing.Point(12, 31);
+            this.label2.Location = new System.Drawing.Point(12, 58);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(60, 13);
             this.label2.TabIndex = 3;
@@ -187,11 +201,11 @@
             // textBoxFilter
             // 
             this.textBoxFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.textBoxFilter.Location = new System.Drawing.Point(80, 6);
+            this.textBoxFilter.Location = new System.Drawing.Point(86, 6);
             this.textBoxFilter.Name = "textBoxFilter";
             this.textBoxFilter.Size = new System.Drawing.Size(179, 20);
             this.textBoxFilter.TabIndex = 0;
-            this.textBoxFilter.TextChanged += new System.EventHandler(this.textBoxFilter_TextChanged);
+            this.textBoxFilter.TextChanged += new System.EventHandler(this.UseFilter);
             // 
             // tablePresentationComboBox
             // 
@@ -207,6 +221,14 @@
             this.tablePresentationComboBox.TabIndex = 0;
             this.tablePresentationComboBox.SelectionChangeCommitted += new System.EventHandler(this.tablePresentationComboBox_ItemChanged);
             // 
+            // exactSearch
+            // 
+            this.exactSearch.Location = new System.Drawing.Point(86, 29);
+            this.exactSearch.Name = "exactSearch";
+            this.exactSearch.Size = new System.Drawing.Size(104, 24);
+            this.exactSearch.TabIndex = 0;
+            this.exactSearch.CheckedChanged += new System.EventHandler(this.UseFilter);
+            // 
             // splitContainer1
             // 
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -220,7 +242,7 @@
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.dataGridViewSymbolInfo);
-            this.splitContainer1.Size = new System.Drawing.Size(1379, 603);
+            this.splitContainer1.Size = new System.Drawing.Size(1379, 573);
             this.splitContainer1.SplitterDistance = 803;
             this.splitContainer1.TabIndex = 2;
             // 
@@ -230,6 +252,7 @@
             this.dataGridSymbols.AllowUserToDeleteRows = false;
             dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(128)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
             this.dataGridSymbols.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            this.dataGridSymbols.AutoGenerateColumns = true;
             this.dataGridSymbols.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dataGridSymbols.DataSource = this.bindingSourceSymbols;
             this.dataGridSymbols.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -238,7 +261,7 @@
             this.dataGridSymbols.ReadOnly = true;
             this.dataGridSymbols.RowHeadersVisible = false;
             this.dataGridSymbols.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dataGridSymbols.Size = new System.Drawing.Size(803, 603);
+            this.dataGridSymbols.Size = new System.Drawing.Size(803, 573);
             this.dataGridSymbols.TabIndex = 2;
             this.dataGridSymbols.RowsAdded += new System.Windows.Forms.DataGridViewRowsAddedEventHandler(this.SetColumnSizeEquel);
             this.dataGridSymbols.SelectionChanged += new System.EventHandler(this.dataGridSymbols_SelectionChanged);
@@ -261,7 +284,7 @@
             this.dataGridViewSymbolInfo.ReadOnly = true;
             this.dataGridViewSymbolInfo.RowHeadersVisible = false;
             this.dataGridViewSymbolInfo.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dataGridViewSymbolInfo.Size = new System.Drawing.Size(572, 603);
+            this.dataGridViewSymbolInfo.Size = new System.Drawing.Size(572, 573);
             this.dataGridViewSymbolInfo.TabIndex = 0;
             this.dataGridViewSymbolInfo.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.dataGridViewSymbolInfo_CellPainting);
             this.dataGridViewSymbolInfo.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.dataGridSymbols_SortCompare);
@@ -338,6 +361,8 @@
             this.MainMenuStrip = this.mainMenu;
             this.Name = "PadAnalyzer";
             this.Text = "Pad Analyzer";
+            this.Load += new System.EventHandler(this.SetColumnSizeEquel);
+            this.Resize += new System.EventHandler(this.SetColumnSizeEquel);
             this.mainMenu.ResumeLayout(false);
             this.mainMenu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSourceSymbols)).EndInit();
@@ -355,8 +380,7 @@
             this.contextMenuStrip1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
-            this.Resize += new System.EventHandler(this.SetColumnSizeEquel);
-            this.Load += new System.EventHandler(this.SetColumnSizeEquel);
+
         }
 
         #endregion
@@ -387,6 +411,8 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn colFieldOffset;
         private System.Windows.Forms.DataGridViewTextBoxColumn colFieldSize;
         private System.Windows.Forms.DataGridViewTextBoxColumn colType;
+        private System.Windows.Forms.CheckBox exactSearch;
+        private System.Windows.Forms.Label label3;
     }
 }
 

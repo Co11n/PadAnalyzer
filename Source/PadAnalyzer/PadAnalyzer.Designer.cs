@@ -98,14 +98,14 @@
             this.loadPDBToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
             this.loadPDBToolStripMenuItem.Size = new System.Drawing.Size(177, 22);
             this.loadPDBToolStripMenuItem.Text = "Load PDB...";
-            this.loadPDBToolStripMenuItem.Click += new System.EventHandler(this.loadPDBToolStripMenuItem_Click);
+            this.loadPDBToolStripMenuItem.Click += new System.EventHandler(this.LoadPDBToolStripMenuItem_Click);
             // 
             // exitToolStripMenuItem
             // 
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             this.exitToolStripMenuItem.Size = new System.Drawing.Size(177, 22);
             this.exitToolStripMenuItem.Text = "Exit";
-            this.exitToolStripMenuItem.Click += new System.EventHandler(this.exitToolStripMenuItem_Click);
+            this.exitToolStripMenuItem.Click += new System.EventHandler(this.ExitToolStripMenuItem_Click);
             // 
             // openPdbDialog
             // 
@@ -169,8 +169,8 @@
             this.textBoxCache.Size = new System.Drawing.Size(34, 20);
             this.textBoxCache.TabIndex = 4;
             this.textBoxCache.Text = "0";
-            this.textBoxCache.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.textBoxCache_KeyPress);
-            this.textBoxCache.Leave += new System.EventHandler(this.textBoxCache_Leave);
+            this.textBoxCache.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TextBoxCache_KeyPress);
+            this.textBoxCache.Leave += new System.EventHandler(this.TextBoxCache_Leave);
             // 
             // label2
             // 
@@ -223,7 +223,7 @@
             this.tablePresentationComboBox.Name = "tablePresentationComboBox";
             this.tablePresentationComboBox.Size = new System.Drawing.Size(222, 21);
             this.tablePresentationComboBox.TabIndex = 0;
-            this.tablePresentationComboBox.SelectionChangeCommitted += new System.EventHandler(this.tablePresentationComboBox_ItemChanged);
+            this.tablePresentationComboBox.SelectionChangeCommitted += new System.EventHandler(this.TablePresentationComboBox_ItemChanged);
             // 
             // exactSearch
             // 
@@ -268,8 +268,8 @@
             this.dataGridSymbols.Size = new System.Drawing.Size(803, 573);
             this.dataGridSymbols.TabIndex = 2;
             this.dataGridSymbols.RowsAdded += new System.Windows.Forms.DataGridViewRowsAddedEventHandler(this.SetColumnSizeEquel);
-            this.dataGridSymbols.SelectionChanged += new System.EventHandler(this.dataGridSymbols_SelectionChanged);
-            this.dataGridSymbols.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.dataGridSymbols_SortCompare);
+            this.dataGridSymbols.SelectionChanged += new System.EventHandler(this.DataGridSymbols_SelectionChanged);
+            this.dataGridSymbols.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.DataGridSymbols_SortCompare);
             // 
             // dataGridViewSymbolInfo
             // 
@@ -290,8 +290,8 @@
             this.dataGridViewSymbolInfo.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dataGridViewSymbolInfo.Size = new System.Drawing.Size(572, 573);
             this.dataGridViewSymbolInfo.TabIndex = 0;
-            this.dataGridViewSymbolInfo.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.dataGridViewSymbolInfo_CellPainting);
-            this.dataGridViewSymbolInfo.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.dataGridSymbols_SortCompare);
+            this.dataGridViewSymbolInfo.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.DataGridViewSymbolInfo_CellPainting);
+            this.dataGridViewSymbolInfo.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.DataGridSymbols_SortCompare);
             // 
             // colField
             // 
@@ -332,28 +332,28 @@
             this.copyTypeLayoutToClipboardToolStripMenuItem.Name = "copyTypeLayoutToClipboardToolStripMenuItem";
             this.copyTypeLayoutToClipboardToolStripMenuItem.Size = new System.Drawing.Size(238, 22);
             this.copyTypeLayoutToClipboardToolStripMenuItem.Text = "Copy Type Layout To Clipboard";
-            this.copyTypeLayoutToClipboardToolStripMenuItem.Click += new System.EventHandler(this.copyTypeLayoutToClipboardToolStripMenuItem_Click);
+            this.copyTypeLayoutToClipboardToolStripMenuItem.Click += new System.EventHandler(this.CopyTypeLayoutToClipboardToolStripMenuItem_Click);
             // 
             // setPrefetchStartOffsetToolStripMenuItem
             // 
             this.setPrefetchStartOffsetToolStripMenuItem.Name = "setPrefetchStartOffsetToolStripMenuItem";
             this.setPrefetchStartOffsetToolStripMenuItem.Size = new System.Drawing.Size(238, 22);
             this.setPrefetchStartOffsetToolStripMenuItem.Text = "Set Prefetch Start Offset";
-            this.setPrefetchStartOffsetToolStripMenuItem.Click += new System.EventHandler(this.setPrefetchStartOffsetToolStripMenuItem_Click);
+            this.setPrefetchStartOffsetToolStripMenuItem.Click += new System.EventHandler(this.SetPrefetchStartOffsetToolStripMenuItem_Click);
             // 
             // bgWorker
             // 
             this.bgWorker.WorkerReportsProgress = true;
-            this.bgWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.bgWorker_DoWork);
-            this.bgWorker.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.bgWorker_ProgressChanged);
-            this.bgWorker.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.bgWorker_RunWorkerCompleted);
+            this.bgWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.BgWorker_DoWork);
+            this.bgWorker.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.BgWorker_ProgressChanged);
+            this.bgWorker.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.BgWorker_RunWorkerCompleted);
             // 
             // bgWorkerTableData
             // 
             this.bgWorkerTableData.WorkerReportsProgress = true;
-            this.bgWorkerTableData.DoWork += new System.ComponentModel.DoWorkEventHandler(this.bgWorkerTableData_DoWork);
-            this.bgWorkerTableData.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.bgWorkerTableData_ProgressChanged);
-            this.bgWorkerTableData.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.bgWorkerTableData_RunWorkerCompleted);
+            this.bgWorkerTableData.DoWork += new System.ComponentModel.DoWorkEventHandler(this.BgWorkerTableData_DoWork);
+            this.bgWorkerTableData.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(this.BgWorkerTableData_ProgressChanged);
+            this.bgWorkerTableData.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.BgWorkerTableData_RunWorkerCompleted);
             // 
             // PadAnalyzer
             // 

@@ -220,22 +220,6 @@ namespace PadAnalyzer
 
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        private void SetColumnSizeEquel(object sender, EventArgs e)
-        {
-            for (int i = 0; i < dataGridSymbols.Columns.Count; ++i)
-            {
-                dataGridSymbols.Columns[i].Width = dataGridSymbols.Width / dataGridSymbols.Columns.Count;
-            }
-
-            for (int i = 0; i < dataGridViewSymbolInfo.Columns.Count; ++i)
-            {
-                dataGridViewSymbolInfo.Columns[i].Width = dataGridViewSymbolInfo.Width / dataGridViewSymbolInfo.Columns.Count;
-            }
-        }
-
         Dictionary<string, TableViewTypes> dictViewTableTypes =
             new Dictionary<string, TableViewTypes>()
         {
@@ -295,14 +279,30 @@ namespace PadAnalyzer
 
         long m_prefetchStartOffset = 0;
 
-        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
+        String currentFileName;
+
+        /// <summary>
+        /// Function to calculate tables column width
+        /// </summary>
+        private void SetColumnSizeEquel(object sender, EventArgs e)
+        {
+            for (int i = 0; i < dataGridSymbols.Columns.Count; ++i)
+            {
+                dataGridSymbols.Columns[i].Width = dataGridSymbols.Width / dataGridSymbols.Columns.Count;
+            }
+
+            for (int i = 0; i < dataGridViewSymbolInfo.Columns.Count; ++i)
+            {
+                dataGridViewSymbolInfo.Columns[i].Width = dataGridViewSymbolInfo.Width / dataGridViewSymbolInfo.Columns.Count;
+            }
+        }
+
+        private void ExitToolStripMenuItem_Click(object sender, EventArgs e)
         {
             this.Close();
         }
 
-        String currentFileName;
-
-        private void loadPDBToolStripMenuItem_Click(object sender, EventArgs e)
+        private void LoadPDBToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (IsDataTableBusy())
             {
@@ -328,7 +328,7 @@ namespace PadAnalyzer
             }
         }
 
-        void CreateDataTableColumns(DataTable table, TableViewTypes tableType)
+        private void CreateDataTableColumns(DataTable table, TableViewTypes tableType)
         {
             Dictionary<string, Type> columnNames = new Dictionary<string, Type>();
             
@@ -364,7 +364,7 @@ namespace PadAnalyzer
             }
         }
 
-        void PopulateDataTable(string fileName)
+        private void PopulateDataTable(string fileName)
         {
             m_symbols.Clear();
 
@@ -421,7 +421,7 @@ namespace PadAnalyzer
             return null;
         }
 
-        ulong GetCacheLineSize()
+        private ulong GetCacheLineSize()
         {
             return Convert.ToUInt32(textBoxCache.Text);
         }
@@ -547,7 +547,7 @@ namespace PadAnalyzer
             bindingSourceSymbols.DataSource = m_table;
         }
 
-        private void dataGridSymbols_SelectionChanged(object sender, EventArgs e)
+        private void DataGridSymbols_SelectionChanged(object sender, EventArgs e)
         {
             m_prefetchStartOffset = 0;
             ShowSelectedSymbolInfo();
@@ -584,34 +584,17 @@ namespace PadAnalyzer
             long cacheLineSize = (long)GetCacheLineSize();
             long prevCacheBoundaryOffset = m_prefetchStartOffset;
 
-            prevCacheBoundaryOffset = Math.Min(prevCacheBoundaryOffset, info.m_size);
-
             long numCacheLines = 0;
             long numCacheLinesBetweenChildren = 0;
+            long childEndOffset;
+            long cacheLineBound = 0;
+            long cacheLineOffset = 0;
+            string intersectStatus = "";
 
             int paddingOffset = 0;
 
             foreach (SymbolInfo child in info.m_children)
             {
-                if (cacheLineSize > 0)
-                {
-                    long cacheLineOffset = 0;
-
-                    numCacheLinesBetweenChildren = (child.m_offset - prevCacheBoundaryOffset) / cacheLineSize;
-
-                    if (numCacheLinesBetweenChildren > 0)
-                    {
-                        numCacheLines += numCacheLinesBetweenChildren;
-                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
-
-                        string cacheInfo = string.Format("{0}x{1}", numCacheLinesBetweenChildren, cacheLineSize);
-                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), cacheInfo, "" };
-                        dataGridViewSymbolInfo.Rows.Add(boundaryRow);
-                        
-                        prevCacheBoundaryOffset = cacheLineOffset;
-                    }
-                }
-
                 // Present child info
                 string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_type_name };
                 dataGridViewSymbolInfo.Rows.Add(row);
@@ -620,8 +603,39 @@ namespace PadAnalyzer
                 if (child.m_padding > 0)
                 {
                     paddingOffset = child.m_offset + child.m_size;
+
                     string[] paddingRow = { "Padding", paddingOffset.ToString(), child.m_padding.ToString(), "" };
                     dataGridViewSymbolInfo.Rows.Add(paddingRow);
+                }
+
+                if (cacheLineSize > 0)
+                {
+                    childEndOffset = child.m_offset + child.m_size + child.m_padding;
+
+                    numCacheLinesBetweenChildren = (childEndOffset - prevCacheBoundaryOffset) / cacheLineSize;
+                    numCacheLines += numCacheLinesBetweenChildren;
+
+                    if (numCacheLinesBetweenChildren > 0)
+                    {
+                        cacheLineBound = numCacheLines * cacheLineSize;
+
+                        if (cacheLineBound != childEndOffset)
+                        {
+                            intersectStatus = string.Format("Intesects cacheline: {0}", child.m_name);
+                        }
+                        else
+                        {
+                            intersectStatus = "";
+                        }
+
+                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
+
+                        string cacheInfo = string.Format("{0}x{1}", numCacheLinesBetweenChildren, cacheLineSize);
+                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), cacheInfo, intersectStatus };
+                        dataGridViewSymbolInfo.Rows.Add(boundaryRow);
+
+                        prevCacheBoundaryOffset = cacheLineOffset;
+                    }
                 }
             }
         }
@@ -632,7 +646,7 @@ namespace PadAnalyzer
             dataGridViewSymbolInfo.Rows.Clear();            
         }
 
-        private void dataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
+        private void DataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
         {
             if (e.Column.Index > 0)
             {
@@ -641,7 +655,7 @@ namespace PadAnalyzer
             }
         }
 
-        private void dataGridViewSymbolInfo_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DataGridViewSymbolInfo_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
             foreach (DataGridViewRow row in dataGridViewSymbolInfo.Rows)
             {
@@ -652,18 +666,33 @@ namespace PadAnalyzer
                     cell.Style.BackColor = Color.LightGray;
                     row.Cells[1].Style.BackColor = Color.LightGray;
                     row.Cells[2].Style.BackColor = Color.LightGray;
+                    row.Cells[3].Style.BackColor = Color.LightGray;
                 }
                 else if (cell.Value.ToString().IndexOf("Base: ") == 0)
                 {
                     cell.Style.BackColor = Color.LightGreen;
                     row.Cells[1].Style.BackColor = Color.LightGreen;
                     row.Cells[2].Style.BackColor = Color.LightGreen;
+                    row.Cells[3].Style.BackColor = Color.LightGreen;
                 }
                 else if (cell.Value.ToString().IndexOf("Cacheline boundary") >= 0)
                 {
-                    cell.Style.BackColor = Color.LightPink;
-                    row.Cells[1].Style.BackColor = Color.LightPink;
-                    row.Cells[2].Style.BackColor = Color.LightPink;
+                    DataGridViewCell cellType = row.Cells[3];
+
+                    if (cellType.Value.ToString().IndexOf("Intesects cacheline") == 0)
+                    {
+                        cell.Style.BackColor = Color.OrangeRed;
+                        row.Cells[1].Style.BackColor = Color.OrangeRed;
+                        row.Cells[2].Style.BackColor = Color.OrangeRed;
+                        row.Cells[3].Style.BackColor = Color.OrangeRed;
+                    }
+                    else
+                    {
+                        cell.Style.BackColor = Color.LightPink;
+                        row.Cells[1].Style.BackColor = Color.LightPink;
+                        row.Cells[2].Style.BackColor = Color.LightPink;
+                        row.Cells[3].Style.BackColor = Color.LightPink;
+                    }
                 }
             }
         }
@@ -691,7 +720,7 @@ namespace PadAnalyzer
             }
         }
 
-        void dumpSymbolInfo(System.IO.TextWriter tw, SymbolInfo info)
+        private void DumpSymbolInfo(System.IO.TextWriter tw, SymbolInfo info)
         {
             tw.WriteLine("Symbol: " + info.m_name);
             tw.WriteLine("Size: " + info.m_size.ToString());
@@ -717,30 +746,34 @@ namespace PadAnalyzer
             }
         }
 
-        private void copyTypeLayoutToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
+        private void CopyTypeLayoutToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
         {
             SymbolInfo info = FindSelectedSymbolInfo();
+
             if (info != null)
             {
                 System.IO.StringWriter tw = new System.IO.StringWriter();
-                dumpSymbolInfo(tw, info);
+                DumpSymbolInfo(tw, info);
                 Clipboard.SetText(tw.ToString());
             }
         }
 
-        private void textBoxCache_KeyPress(object sender, KeyPressEventArgs e)
+        private void TextBoxCache_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Enter || e.KeyChar == (char)Keys.Escape)
+            {
                 ShowSelectedSymbolInfo();
+            }
+
             base.OnKeyPress(e);
         }
 
-        private void textBoxCache_Leave(object sender, EventArgs e)
+        private void TextBoxCache_Leave(object sender, EventArgs e)
         {
             ShowSelectedSymbolInfo();
         }
 
-        private void setPrefetchStartOffsetToolStripMenuItem_Click(object sender, EventArgs e)
+        private void SetPrefetchStartOffsetToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (dataGridViewSymbolInfo.SelectedRows.Count != 0)
             {
@@ -753,7 +786,7 @@ namespace PadAnalyzer
 
         private bool IsDataTableBusy()
         {
-            return this.bgWorkerTableData.IsBusy || bgWorker.IsBusy;
+            return bgWorkerTableData.IsBusy || bgWorker.IsBusy;
         }
 
         private class SymbolAddressComparator : IComparer<Tuple<string, uint, ulong>>
@@ -839,7 +872,7 @@ namespace PadAnalyzer
 
                     // Calculate the current progress
                     i++;
-                    progressPercent = (int)((i * 100) / m_symbols.Count);
+                    progressPercent = ((i * 100) / m_symbols.Count);
 
                     if (prevProgressPercent < progressPercent)
                     {
@@ -888,7 +921,7 @@ namespace PadAnalyzer
 
                     // Calculate the current progress
                     i++;
-                    progressPercent = (int)((i * 100) / globalVariableList.Count);
+                    progressPercent = ((i * 100) / globalVariableList.Count);
 
                     if (prevProgressPercent < progressPercent)
                     {
@@ -901,10 +934,10 @@ namespace PadAnalyzer
             m_table.EndLoadData();            
         }
 
-        private void tablePresentationComboBox_ItemChanged(object sender, EventArgs e)
+        private void TablePresentationComboBox_ItemChanged(object sender, EventArgs e)
         {
             ComboBox viewTablecomboBox = (ComboBox)sender;
-            TableViewTypes selectedTableView = dictViewTableTypes[this.tablePresentationComboBox.Text];
+            TableViewTypes selectedTableView = dictViewTableTypes[tablePresentationComboBox.Text];
 
             if (IsDataTableBusy())
             {
@@ -912,26 +945,26 @@ namespace PadAnalyzer
             }
             else
             {
-                this.textBoxFilter.Text = "";
-                this.tablePresentationComboBox.Enabled = false;
+                textBoxFilter.Text = "";
+                tablePresentationComboBox.Enabled = false;
                 ResetDataTable();
                 CreateDataTableColumns(m_table, selectedTableView);
                 
-                this.bgWorkerTableData.RunWorkerAsync(selectedTableView);
+                bgWorkerTableData.RunWorkerAsync(selectedTableView);
             }
         }
 
-        private void bgWorkerTableData_DoWork(object sender, DoWorkEventArgs e)
+        private void BgWorkerTableData_DoWork(object sender, DoWorkEventArgs e)
         {
             FillDataTable(sender, (TableViewTypes)e.Argument);
         }
 
-        private void bgWorkerTableData_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private void BgWorkerTableData_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            progressBar.Value = (int)((progressBar.Maximum * e.ProgressPercentage) / 100);
+            progressBar.Value = ((progressBar.Maximum * e.ProgressPercentage) / 100);
         }
 
-        private void bgWorkerTableData_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void BgWorkerTableData_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             // Sort by name by default (ascending)
             dataGridSymbols.Sort(dataGridSymbols.Columns[0], ListSortDirection.Ascending);
@@ -939,30 +972,30 @@ namespace PadAnalyzer
 
             ShowSelectedSymbolInfo();
 
-            this.progressBar.Value = progressBar.Maximum;
-            this.tablePresentationComboBox.Enabled = true;
+            progressBar.Value = progressBar.Maximum;
+            tablePresentationComboBox.Enabled = true;
         }
 
-        private void bgWorker_DoWork(object sender, DoWorkEventArgs e)
+        private void BgWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             PopulateDataTable(e.Argument as string);
             FillDataTable(sender, TableViewTypes.ClassFieldData);
         }
 
-        private void bgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private void BgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            progressBar.Value = (int)((progressBar.Maximum * e.ProgressPercentage) / 100);
+            progressBar.Value = ((progressBar.Maximum * e.ProgressPercentage) / 100);
         }
 
-        private void bgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void BgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             dataGridSymbols.Sort(dataGridSymbols.Columns[0], ListSortDirection.Ascending);
             bindingSourceSymbols.Filter = null;
 
             ShowSelectedSymbolInfo();
 
-            this.Text = "Pad Analyzer: Loaded " + currentFileName;
-            this.tablePresentationComboBox.Enabled = true;
+            Text = "Pad Analyzer: Loaded " + currentFileName;
+            tablePresentationComboBox.Enabled = true;
         }
     }
 }

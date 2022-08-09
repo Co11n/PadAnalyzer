@@ -518,19 +518,22 @@ namespace PadAnalyzer
         private SymbolInfo FindSelectedSymbolInfo()
         {
             if (dataGridSymbols.SelectedRows.Count == 0)
+            {
                 return null;
+            }
 
             DataGridViewRow selectedRow = dataGridSymbols.SelectedRows[0];
             string symbolName = selectedRow.Cells[0].Value.ToString();
 
             SymbolInfo info = FindSymbolInfo(symbolName);
+
             return info;
         }
 
         private SymbolInfo FindSymbolInfo(string name)
         {
-            SymbolInfo info;
-            m_symbols.TryGetValue(name, out info);
+            m_symbols.TryGetValue(name, out SymbolInfo info);
+
             return info;
         }
 
@@ -555,20 +558,21 @@ namespace PadAnalyzer
 
         void ShowSelectedSymbolInfo()
         {
-            SymbolInfo info = FindSelectedSymbolInfo();
+            SymbolInfo info = null;
+            TableViewTypes selectedTableView = dictViewTableTypes[tablePresentationComboBox.Text];
 
-            if (info != null)
+            if (selectedTableView == TableViewTypes.ClassFieldData)
             {
-                TableViewTypes selectedTableView = dictViewTableTypes[this.tablePresentationComboBox.Text];
+                info = FindSelectedSymbolInfo();
 
-                if (selectedTableView == TableViewTypes.ClassFieldData)
+                if (info != null)
                 {
                     ShowSymbolInfo(info);
                 }
-                else if (selectedTableView == TableViewTypes.ClassStaticData || selectedTableView == TableViewTypes.GlobalStaticData)
-                {
-                    ShowSymbolStaticInfo(info);
-                }                
+            }
+            else if (selectedTableView == TableViewTypes.ClassStaticData || selectedTableView == TableViewTypes.GlobalStaticData)
+            {
+                ShowSymbolStaticInfo(info);
             }
         }
 

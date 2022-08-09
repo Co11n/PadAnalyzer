@@ -36,7 +36,7 @@
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openPdbDialog = new System.Windows.Forms.OpenFileDialog();
             this.bindingSourceSymbols = new System.Windows.Forms.BindingSource(this.components);
-            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+            this.mainInterfaceContainer = new System.Windows.Forms.SplitContainer();
             this.label3 = new System.Windows.Forms.Label();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.textBoxCache = new System.Windows.Forms.MaskedTextBox();
@@ -46,7 +46,7 @@
             this.textBoxFilter = new System.Windows.Forms.TextBox();
             this.tablePresentationComboBox = new System.Windows.Forms.ComboBox();
             this.exactSearch = new System.Windows.Forms.CheckBox();
-            this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.symbolTableContainer = new System.Windows.Forms.SplitContainer();
             this.dataGridSymbols = new System.Windows.Forms.DataGridView();
             this.dataGridViewSymbolInfo = new System.Windows.Forms.DataGridView();
             this.colField = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -60,14 +60,14 @@
             this.bgWorkerTableData = new System.ComponentModel.BackgroundWorker();
             this.mainMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSourceSymbols)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
-            this.splitContainer2.Panel1.SuspendLayout();
-            this.splitContainer2.Panel2.SuspendLayout();
-            this.splitContainer2.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
-            this.splitContainer1.Panel1.SuspendLayout();
-            this.splitContainer1.Panel2.SuspendLayout();
-            this.splitContainer1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.mainInterfaceContainer)).BeginInit();
+            this.mainInterfaceContainer.Panel1.SuspendLayout();
+            this.mainInterfaceContainer.Panel2.SuspendLayout();
+            this.mainInterfaceContainer.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.symbolTableContainer)).BeginInit();
+            this.symbolTableContainer.Panel1.SuspendLayout();
+            this.symbolTableContainer.Panel2.SuspendLayout();
+            this.symbolTableContainer.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridSymbols)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewSymbolInfo)).BeginInit();
             this.contextMenuStrip1.SuspendLayout();
@@ -113,30 +113,34 @@
             // 
             // splitContainer2
             // 
-            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer2.IsSplitterFixed = true;
-            this.splitContainer2.Location = new System.Drawing.Point(0, 24);
-            this.splitContainer2.Name = "splitContainer2";
-            this.splitContainer2.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            this.mainInterfaceContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.mainInterfaceContainer.IsSplitterFixed = true;
+            this.mainInterfaceContainer.Location = new System.Drawing.Point(0, 24);
+            this.mainInterfaceContainer.Name = "splitContainer2";
+            this.mainInterfaceContainer.Orientation = System.Windows.Forms.Orientation.Horizontal;
             // 
             // splitContainer2.Panel1
             // 
-            this.splitContainer2.Panel1.Controls.Add(this.label3);
-            this.splitContainer2.Panel1.Controls.Add(this.progressBar);
-            this.splitContainer2.Panel1.Controls.Add(this.textBoxCache);
-            this.splitContainer2.Panel1.Controls.Add(this.label2);
-            this.splitContainer2.Panel1.Controls.Add(this.label1);
-            this.splitContainer2.Panel1.Controls.Add(this.ProgressLabel);
-            this.splitContainer2.Panel1.Controls.Add(this.textBoxFilter);
-            this.splitContainer2.Panel1.Controls.Add(this.tablePresentationComboBox);
-            this.splitContainer2.Panel1.Controls.Add(this.exactSearch);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.label3);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.progressBar);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.textBoxCache);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.label2);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.label1);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.ProgressLabel);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.textBoxFilter);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.tablePresentationComboBox);
+            this.mainInterfaceContainer.Panel1.Controls.Add(this.exactSearch);
+            this.progressBar.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            this.ProgressLabel.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            this.tablePresentationComboBox.Anchor = System.Windows.Forms.AnchorStyles.Right;
+
             // 
             // splitContainer2.Panel2
             // 
-            this.splitContainer2.Panel2.Controls.Add(this.splitContainer1);
-            this.splitContainer2.Size = new System.Drawing.Size(1379, 659);
-            this.splitContainer2.SplitterDistance = 82;
-            this.splitContainer2.TabIndex = 1;
+            this.mainInterfaceContainer.Panel2.Controls.Add(this.symbolTableContainer);
+            this.mainInterfaceContainer.Size = new System.Drawing.Size(1379, 659);
+            this.mainInterfaceContainer.SplitterDistance = 82;
+            this.mainInterfaceContainer.TabIndex = 1;
             // 
             // label3
             // 
@@ -231,20 +235,20 @@
             // 
             // splitContainer1
             // 
-            this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer1.Location = new System.Drawing.Point(0, 0);
-            this.splitContainer1.Name = "splitContainer1";
+            this.symbolTableContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.symbolTableContainer.Location = new System.Drawing.Point(0, 0);
+            this.symbolTableContainer.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.dataGridSymbols);
+            this.symbolTableContainer.Panel1.Controls.Add(this.dataGridSymbols);
             // 
             // splitContainer1.Panel2
             // 
-            this.splitContainer1.Panel2.Controls.Add(this.dataGridViewSymbolInfo);
-            this.splitContainer1.Size = new System.Drawing.Size(1379, 573);
-            this.splitContainer1.SplitterDistance = 803;
-            this.splitContainer1.TabIndex = 2;
+            this.symbolTableContainer.Panel2.Controls.Add(this.dataGridViewSymbolInfo);
+            this.symbolTableContainer.Size = new System.Drawing.Size(1379, 573);
+            this.symbolTableContainer.SplitterDistance = 803;
+            this.symbolTableContainer.TabIndex = 2;
             // 
             // dataGridSymbols
             // 
@@ -356,7 +360,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1379, 683);
-            this.Controls.Add(this.splitContainer2);
+            this.Controls.Add(this.mainInterfaceContainer);
             this.Controls.Add(this.mainMenu);
             this.MainMenuStrip = this.mainMenu;
             this.Name = "PadAnalyzer";
@@ -366,15 +370,15 @@
             this.mainMenu.ResumeLayout(false);
             this.mainMenu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSourceSymbols)).EndInit();
-            this.splitContainer2.Panel1.ResumeLayout(false);
-            this.splitContainer2.Panel1.PerformLayout();
-            this.splitContainer2.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
-            this.splitContainer2.ResumeLayout(false);
-            this.splitContainer1.Panel1.ResumeLayout(false);
-            this.splitContainer1.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
-            this.splitContainer1.ResumeLayout(false);
+            this.mainInterfaceContainer.Panel1.ResumeLayout(false);
+            this.mainInterfaceContainer.Panel1.PerformLayout();
+            this.mainInterfaceContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.mainInterfaceContainer)).EndInit();
+            this.mainInterfaceContainer.ResumeLayout(false);
+            this.symbolTableContainer.Panel1.ResumeLayout(false);
+            this.symbolTableContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.symbolTableContainer)).EndInit();
+            this.symbolTableContainer.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridSymbols)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewSymbolInfo)).EndInit();
             this.contextMenuStrip1.ResumeLayout(false);
@@ -391,8 +395,8 @@
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.OpenFileDialog openPdbDialog;
         private System.Windows.Forms.BindingSource bindingSourceSymbols;
-        private System.Windows.Forms.SplitContainer splitContainer2;
-        private System.Windows.Forms.SplitContainer splitContainer1;
+        private System.Windows.Forms.SplitContainer mainInterfaceContainer;
+        private System.Windows.Forms.SplitContainer symbolTableContainer;
         private System.Windows.Forms.DataGridView dataGridSymbols;
         private System.Windows.Forms.DataGridView dataGridViewSymbolInfo;
         private System.Windows.Forms.Label label1;

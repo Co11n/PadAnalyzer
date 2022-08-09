@@ -589,9 +589,7 @@ namespace PadAnalyzer
             long numCacheLines = 0;
             long numCacheLinesBetweenChildren = 0;
 
-            int currentMemberOffset = 0;
-            int currentMemberSize = 0;
-            int currentMemberPadding = 0;
+            int paddingOffset = 0;
 
             foreach (SymbolInfo child in info.m_children)
             {
@@ -614,39 +612,17 @@ namespace PadAnalyzer
                     }
                 }
 
-                // Check for union members or members that could be in integrated data types
-                if (currentMemberOffset == child.m_offset)
-                {
-                    if (child.m_size > currentMemberSize)
-                    {
-                        currentMemberSize = child.m_size;
-                        currentMemberPadding = child.m_padding;
-                    }
-                }
-                else
-                {
-                    if (currentMemberPadding > 0)
-                    {
-                        long paddingOffset = currentMemberOffset + currentMemberSize;
-                        string[] paddingRow = { "Padding", paddingOffset.ToString(), currentMemberPadding.ToString(), "" };
-                        dataGridViewSymbolInfo.Rows.Add(paddingRow);
-                    }
-
-                    currentMemberOffset = child.m_offset;
-                    currentMemberPadding = child.m_padding;
-                    currentMemberSize = child.m_size;
-                }
-
+                // Present child info
                 string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_type_name };
                 dataGridViewSymbolInfo.Rows.Add(row);
-            }
 
-            // Add last offset
-            if (currentMemberPadding > 0)
-            {
-                long paddingOffset = currentMemberOffset + currentMemberSize;
-                string[] paddingRow = { "Padding", paddingOffset.ToString(), currentMemberPadding.ToString(), "" };
-                dataGridViewSymbolInfo.Rows.Add(paddingRow);
+                // Present child padding info
+                if (child.m_padding > 0)
+                {
+                    paddingOffset = child.m_offset + child.m_size;
+                    string[] paddingRow = { "Padding", paddingOffset.ToString(), child.m_padding.ToString(), "" };
+                    dataGridViewSymbolInfo.Rows.Add(paddingRow);
+                }
             }
         }
 

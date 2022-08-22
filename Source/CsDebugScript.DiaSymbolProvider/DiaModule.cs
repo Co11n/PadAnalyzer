@@ -64,11 +64,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="module">The module.</param>
         public DiaModule(string pdbPath, Module module)
         {
-            IDiaSession diaSession;
-
             dia = DiaLoader.CreateDiaSource();
             dia.loadDataFromPdb(pdbPath);
-            dia.openSession(out diaSession);
+            dia.openSession(out IDiaSession diaSession);
             Initialize(diaSession, module);
             PdbPath = pdbPath;
         }
@@ -1433,17 +1431,17 @@ namespace CsDebugScript.Engine.SymbolProviders
         }
 
         /// <summary>
-        /// Get list with section information (object file name, relative virtual adderess, section size)  
+        /// Get list with section information (object file name, relative virtual address, section size)  
         /// </summary>
-        public List<Tuple<string, uint, ulong>> GetSectionsContribInfoList()
+        private List<Tuple<string, uint, ulong>> GetSectionsContribInfoList()
         {
             List<Tuple<string, uint, ulong>> sectionsContribInfoList = new List<Tuple<string, uint, ulong>>();
 
-            DIA.IDiaEnumSectionContribs sectionContibTable = null;
+            IDiaEnumSectionContribs sectionContibTable = null;
 
-            foreach (DIA.IDiaTable table in session.getEnumTables())
+            foreach (IDiaTable table in session.getEnumTables())
             {
-                sectionContibTable = table as DIA.IDiaEnumSectionContribs;
+                sectionContibTable = table as IDiaEnumSectionContribs;
                 
                 if (sectionContibTable != null)
                 {
@@ -1453,7 +1451,7 @@ namespace CsDebugScript.Engine.SymbolProviders
 
             if (sectionContibTable != null)
             {
-                foreach (DIA.IDiaSectionContrib sectionContrib in sectionContibTable)
+                foreach (IDiaSectionContrib sectionContrib in sectionContibTable)
                 {
                     sectionsContribInfoList.Add(Tuple.Create<string, uint, ulong>(
                         sectionContrib.compiland.name, sectionContrib.relativeVirtualAddress, sectionContrib.length));
@@ -1463,21 +1461,60 @@ namespace CsDebugScript.Engine.SymbolProviders
             return sectionsContribInfoList;
         }
 
+        private class SymbolAddressComparator : IComparer<Tuple<string, uint, ulong>>
+        {
+            public int Compare(Tuple<string, uint, ulong> a, Tuple<string, uint, ulong> b)
+            {
+                if (a.Item2 > b.Item2)
+                {
+                    return 1;
+                }
+                else if (a.Item2 < b.Item2)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        }
+
         /// <summary>
         /// Get List of global variables symbols
         /// </summary>
         /// <returns></returns>
-        public List<Tuple<string, uint, uint>> GetGlobalVariablesInfo()
+        public List<Tuple<string, uint, uint, string>> GetGlobalVariablesInfo()
         {
-            List<Tuple<string, uint, uint>> globalVariableList = new List<Tuple<string, uint, uint>>();
+            List<Tuple<string, uint, uint, string>> globalVariableList = new List<Tuple<string, uint, uint, string>>();
+            List<Tuple<string, uint, ulong>> sectionContribInfo = GetSectionsContribInfoList();
+            int sectionContribIndex = -1;
 
             uint globalScopeTypeId = GetGlobalScope();
             IDiaSymbol type = GetTypeFromId(globalScopeTypeId);
             IEnumerable<IDiaSymbol> globalVariables = type.GetChildren(SymTagEnum.Data);
 
+            SymbolAddressComparator symAddressCompare = new SymbolAddressComparator();
+
             foreach (IDiaSymbol variable in globalVariables)
             {
-                globalVariableList.Add(Tuple.Create(variable.name, variable.relativeVirtualAddress, variable.typeId));
+                Tuple<string, uint, ulong> searchObject = new Tuple<string, uint, ulong>("", variable.relativeVirtualAddress, 0);
+                string objectFileName = "No file name";
+
+                sectionContribIndex = sectionContribInfo.BinarySearch(searchObject, symAddressCompare);
+                sectionContribIndex = (sectionContribIndex < 0) ? (sectionContribIndex ^ (-1)) - 1 : sectionContribIndex;
+
+                if (sectionContribIndex >= 0)
+                {
+                    ulong endSectionRVA = sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
+
+                    if (variable.relativeVirtualAddress < endSectionRVA)
+                    {
+                        objectFileName = System.IO.Path.GetFileName(sectionContribInfo[sectionContribIndex].Item1);
+                    }
+                }
+
+                globalVariableList.Add(Tuple.Create(variable.name, variable.relativeVirtualAddress, variable.typeId, objectFileName));
             }
 
             return globalVariableList;

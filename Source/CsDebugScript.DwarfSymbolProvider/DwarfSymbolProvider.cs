@@ -54,24 +54,29 @@ namespace CsDebugScript.DwarfSymbolProvider
             return null;
         }
 
+        /// <summary>
+        /// Load the debuf info from DWARF format
+        /// </summary>
+        /// <param name="location"></param>
+        /// <returns></returns>
         public ISymbolProviderModule LoadModule(string location)
         {
             if (File.Exists(location))
-                //try
+            {
+                using (IDwarfImage image = LoadImage(location, 0))
                 {
-                    using (IDwarfImage image = LoadImage(location, 0))
-                    {
-                        var lineNumberPrograms = new DwarfLineNumberProgram[0];
-                        var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
-                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
+                    var lineNumberPrograms = new DwarfLineNumberProgram[0];
+                    var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
+                    var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
 
-                        if (compilationUnits.Length != 0 || commonInformationEntries.Length != 0)
-                            return new DwarfSymbolProviderModule(location, null, compilationUnits, lineNumberPrograms, commonInformationEntries, image.PublicSymbols, image.CodeSegmentOffset, image.Is64bit);
+                    if (compilationUnits.Length != 0 || commonInformationEntries.Length != 0)
+                    {
+                        return new DwarfSymbolProviderModule(location, null, compilationUnits, lineNumberPrograms, commonInformationEntries,
+                                                             image.PublicSymbols, image.CodeSegmentOffset, image.Is64bit);
                     }
                 }
-                //catch
-                {
-                }
+            }
+            
             return null;
         }
 

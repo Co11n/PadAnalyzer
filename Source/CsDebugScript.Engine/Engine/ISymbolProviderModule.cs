@@ -237,15 +237,10 @@ namespace CsDebugScript.Engine
         string GetSymbolsPath();
 
         /// <summary>
-        /// Get list with section information (object file name, relative virtual adderess, section size)  
-        /// </summary>
-        List<Tuple<string, uint, ulong>> GetSectionsContribInfoList();
-
-        /// <summary>
         /// Get List of global variables symbols
         /// </summary>
         /// <returns></returns>
-        List<Tuple<string, uint, uint>> GetGlobalVariablesInfo();
+        List<Tuple<string, uint, uint, string>> GetGlobalVariablesInfo();
         #endregion
     }
 }

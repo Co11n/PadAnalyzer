@@ -794,25 +794,6 @@ namespace PadAnalyzer
             return bgWorkerTableData.IsBusy || bgWorker.IsBusy;
         }
 
-        private class SymbolAddressComparator : IComparer<Tuple<string, uint, ulong>>
-        {
-            public int Compare(Tuple<string, uint, ulong> a, Tuple<string, uint, ulong> b)
-            {
-                if (a.Item2 > b.Item2)
-                {
-                    return 1;
-                }
-                else if (a.Item2 < b.Item2)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return 0;
-                }
-            }
-        } 
-
         private void FillDataTable(object sender, TableViewTypes selectedTableView)
         {
             BackgroundWorker worker = sender as BackgroundWorker;
@@ -888,39 +869,19 @@ namespace PadAnalyzer
             }
             else if (selectedTableView == TableViewTypes.GlobalStaticData)
             {
-                List<Tuple<string, uint, uint>> globalVariableList = sym.GetGlobalVariablesInfo();
-                List<Tuple<string, uint, ulong>> sectionContribInfo = sym.GetSectionsContribInfoList();
-                int sectionContribIndex = -1;
+                List<Tuple<string, uint, uint, string>> globalVariableList = sym.GetGlobalVariablesInfo();
 
-                SymbolAddressComparator symAddressCompare = new SymbolAddressComparator();
-
-                foreach (var (variableName, variableRelativeVirtualAddress, variableTypeId) in globalVariableList)
+                foreach (var (variableName, variableRelativeVirtualAddress, variableTypeId, fileName) in globalVariableList)
                 {
                     uint globalSymSize = sym.GetTypeSize(variableTypeId);
                     string globalSymType = sym.GetTypeName(variableTypeId);
-
-                    Tuple<string, uint,  ulong> searchObject = new Tuple<string, uint, ulong>("", variableRelativeVirtualAddress, 0);
-
-                    sectionContribIndex = sectionContribInfo.BinarySearch(searchObject, symAddressCompare);
-                    sectionContribIndex = (sectionContribIndex < 0) ? (sectionContribIndex ^ (-1)) - 1: sectionContribIndex;
 
                     DataRow row = m_table.NewRow();
 
                     row["Symbol"] = variableName;
                     row["Size"] = globalSymSize;
                     row["Type"] = globalSymType;
-                    row["Object file"] = "No object file";
-
-                    if (sectionContribIndex >= 0)
-                    {
-                        ulong endSectionRVA = sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
-
-                        if (variableRelativeVirtualAddress < endSectionRVA)
-                        {
-                            string objectFileName = System.IO.Path.GetFileName(sectionContribInfo[sectionContribIndex].Item1);
-                            row["Object file"] = objectFileName;
-                        }
-                    }
+                    row["Object file"] = fileName;  
 
                     m_table.Rows.Add(row);
 

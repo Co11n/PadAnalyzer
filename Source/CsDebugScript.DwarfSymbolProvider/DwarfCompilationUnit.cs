@@ -52,14 +52,15 @@ namespace CsDebugScript.DwarfSymbolProvider
         private void ReadData(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings,
                               DwarfMemoryReader debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
         {
+            int debugDataDescriptionOffset;
+            byte addressSize;
+            byte UnitType = 1; //DW_UT_compile
+
             // Read header
             int beginPosition = debugData.Position;
             ulong length = debugData.ReadLength(out bool is64bit);
             int endPosition = debugData.Position + (int)length;
             ushort version = debugData.ReadUshort();
-            int debugDataDescriptionOffset;
-            byte addressSize;
-            byte UnitType = 1; //DW_UT_compile
 
             if (version >= 5)
             {
@@ -73,7 +74,10 @@ namespace CsDebugScript.DwarfSymbolProvider
                 addressSize = debugData.ReadByte();
             }
 
-            if (UnitType != 1) return;
+            if (UnitType != 1)
+            {
+                return;
+            }
 
             DataDescriptionReader dataDescriptionReader = new DataDescriptionReader(debugDataDescription, debugDataDescriptionOffset);
 
@@ -85,9 +89,8 @@ namespace CsDebugScript.DwarfSymbolProvider
             ulong unitStringOffsetsBase = 0;
             ulong unitStringOffsetsSize = 0;
 
-            while (debugData.Position < endPosition)
+            for (int dataPosition = debugData.Position; debugData.Position < endPosition; dataPosition = debugData.Position)
             {
-                int dataPosition = debugData.Position;
                 uint code = debugData.LEB128();
 
                 if (code == 0)
@@ -317,7 +320,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                     description.Tag != DwarfTag.Inheritance &&
                     description.Tag != DwarfTag.Member &&
                     description.Tag != DwarfTag.CompileUnit &&
-                    description.Tag != DwarfTag.Namespace)
+                    description.Tag != DwarfTag.Namespace &&
+                    description.Tag != DwarfTag.Variable
+                    )
                 {
                     skipSymbol = true;
                 }

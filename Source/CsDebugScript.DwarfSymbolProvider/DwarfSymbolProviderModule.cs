@@ -928,9 +928,9 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="typeId">The type identifier.</param>
         public string GetTypeName(uint typeId)
         {
-            DwarfSymbol type = GetType(typeId);
+            DwarfSymbol varSymbol = GetType(typeId);
 
-            return GetTypeName(type);
+            return GetTypeName(varSymbol);
         }
 
         /// <summary>
@@ -959,6 +959,11 @@ namespace CsDebugScript.DwarfSymbolProvider
         {
             DwarfSymbol type = GetType(typeId);
 
+            return GetTypeSize(type);
+        }
+
+        private uint GetTypeSize(DwarfSymbol type)
+        {
             if (!type.Attributes.ContainsKey(DwarfAttribute.ByteSize))
             {
                 if (type.Tag == DwarfTag.SubroutineType)
@@ -989,7 +994,7 @@ namespace CsDebugScript.DwarfSymbolProvider
 
             return (uint)type.Attributes[DwarfAttribute.ByteSize].Constant;
         }
-
+        
         /// <summary>
         /// Gets the code type tag of the specified type.
         /// </summary>
@@ -2884,9 +2889,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="symbol">The symbol.</param>
         private static DwarfSymbol GetType(DwarfSymbol symbol)
         {
-            DwarfAttributeValue typeAttributeValue;
-
-            if (!symbol.Attributes.TryGetValue(DwarfAttribute.Type, out typeAttributeValue))
+            if (!symbol.Attributes.TryGetValue(DwarfAttribute.Type, out DwarfAttributeValue typeAttributeValue))
             {
                 return null;
             }
@@ -2978,9 +2981,11 @@ namespace CsDebugScript.DwarfSymbolProvider
 
             ContinueSymbolSearch(s => false);
 
-            foreach (var a in globalVariables)
+            foreach (var globalVariable in globalVariables)
             {
-                globalVariableList.Add(Tuple.Create(a.Key, 0U, GetTypeId(a.Value), ""));            
+                DwarfSymbol typeSym = GetType(globalVariable.Value);                
+
+                globalVariableList.Add(Tuple.Create(globalVariable.Key, GetTypeSize(typeSym), GetTypeId(typeSym), ""));            
             }
  
             return globalVariableList;

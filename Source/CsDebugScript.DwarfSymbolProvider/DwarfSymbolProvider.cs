@@ -40,12 +40,14 @@ namespace CsDebugScript.DwarfSymbolProvider
                 {
                     using (IDwarfImage image = LoadImage(location, module.LoadOffset))
                     {
-                        var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
+                        var compilationUnits = ParseCompilationUnits(image);
                         var lineNumberPrograms = ParseLineNumberPrograms(image.DebugLine, image.NormalizeAddress);
-                        var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
+                        var commonInformationEntries = ParseCommonInformationEntries(image);
 
                         if (compilationUnits.Length != 0 || lineNumberPrograms.Length != 0 || commonInformationEntries.Length != 0)
+                        {
                             return new DwarfSymbolProviderModule(location, module, compilationUnits, lineNumberPrograms, commonInformationEntries, image.PublicSymbols, image.CodeSegmentOffset, image.Is64bit);
+                        }
                     }
                 }
                 catch
@@ -66,8 +68,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                 using (IDwarfImage image = LoadImage(location, 0))
                 {
                     var lineNumberPrograms = new DwarfLineNumberProgram[0];
-                    var commonInformationEntries = ParseCommonInformationEntries(image.DebugFrame, image.EhFrame, new DwarfExceptionHandlingFrameParsingInput(image));
-                    var compilationUnits = ParseCompilationUnits(image.DebugData, image.DebugDataDescription, image.DebugDataStrings, image.DebugStringOffsets, image.NormalizeAddress);
+
+                    var commonInformationEntries = ParseCommonInformationEntries(image);
+                    var compilationUnits = ParseCompilationUnits(image);
 
                     if (compilationUnits.Length != 0 || commonInformationEntries.Length != 0)
                     {
@@ -101,12 +104,15 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <summary>
         /// Parses the compilation units.
         /// </summary>
-        /// <param name="debugData">The debug data.</param>
-        /// <param name="debugDataDescription">The debug data description.</param>
-        /// <param name="debugStrings">The debug strings.</param>
-        /// <param name="addressNormalizer">Normalize address delegate (<see cref="NormalizeAddressDelegate"/>)</param>
-        private static DwarfCompilationUnit[] ParseCompilationUnits(byte[] debugData, byte[] debugDataDescription, byte[] debugStrings, byte[] debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
+        /// <param name="image"></param>
+        private static DwarfCompilationUnit[] ParseCompilationUnits(IDwarfImage image)
         {
+            byte[] debugData = image.DebugData; 
+            byte[] debugDataDescription = image.DebugDataDescription;
+            byte[] debugStrings = image.DebugDataStrings;
+            byte[] debugStringOffsets = image.DebugStringOffsets;
+            NormalizeAddressDelegate addressNormalizer = image.NormalizeAddress;
+
             using (DwarfMemoryReader debugDataReader = new DwarfMemoryReader(debugData))
             using (DwarfMemoryReader debugDataDescriptionReader = new DwarfMemoryReader(debugDataDescription))
             using (DwarfMemoryReader debugStringsReader = new DwarfMemoryReader(debugStrings))
@@ -150,11 +156,13 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <summary>
         /// Parses the common information entries.
         /// </summary>
-        /// <param name="debugFrame">The debug frame.</param>
-        /// <param name="ehFrame">The exception handling frames.</param>
-        /// <param name="input">The input data for parsing configuration.</param>
-        private static DwarfCommonInformationEntry[] ParseCommonInformationEntries(byte[] debugFrame, byte[] ehFrame, DwarfExceptionHandlingFrameParsingInput input)
+        /// <param name="image"></param>
+        private static DwarfCommonInformationEntry[] ParseCommonInformationEntries(IDwarfImage image)
         {
+            byte[] debugFrame = image.DebugFrame; 
+            byte[] ehFrame = image.EhFrame;
+            DwarfExceptionHandlingFrameParsingInput input = new DwarfExceptionHandlingFrameParsingInput(image);
+
             List<DwarfCommonInformationEntry> entries = new List<DwarfCommonInformationEntry>();
 
             using (DwarfMemoryReader debugFrameReader = new DwarfMemoryReader(debugFrame))

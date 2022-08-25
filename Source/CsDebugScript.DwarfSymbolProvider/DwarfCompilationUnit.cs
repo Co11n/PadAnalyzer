@@ -271,6 +271,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                         attribute == DwarfAttribute.ByteSize ||
                         attribute == DwarfAttribute.Type ||
                         attribute == DwarfAttribute.DataMemberLocation ||
+                        attribute == DwarfAttribute.External ||
+                        attribute == DwarfAttribute.DataBitOffset ||
+                        attribute == DwarfAttribute.BitSize ||
                         // for inheritance
                         attribute == DwarfAttribute.Virtuality ||
                         // for array

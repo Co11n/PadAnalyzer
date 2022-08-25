@@ -381,8 +381,13 @@ namespace CsDebugScript.Engine.SymbolProviders
             ISymbolProviderModule symbolProviderModule = GetSymbolProviderModule(module);
 
             if (symbolProviderModule == null)
+            {
                 return FallbackSymbolProvider?.GetTypeFieldTypeAndOffset(module, typeId, fieldName);
-            return symbolProviderModule.GetTypeFieldTypeAndOffset(typeId, fieldName);
+            }
+
+            SymbolFieldInfo fieldInfo = symbolProviderModule.GetTypeFieldInfo(typeId, fieldName);
+
+            return Tuple.Create(fieldInfo.typeId, fieldName);
         }
 
         /// <summary>

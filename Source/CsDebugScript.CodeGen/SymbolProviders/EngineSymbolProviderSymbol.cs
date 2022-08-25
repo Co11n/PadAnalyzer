@@ -138,10 +138,10 @@ namespace CsDebugScript.CodeGen.SymbolProviders
             // Non-static fields
             foreach (string fieldName in EngineModuleProvider.GetTypeFieldNames(Id))
             {
-                Tuple<uint, int> fieldTypeAndOffset = EngineModuleProvider.GetTypeFieldTypeAndOffset(Id, fieldName);
-                Symbol fieldType = Module.GetSymbol(fieldTypeAndOffset.Item1);
+                SymbolFieldInfo fieldInfo = EngineModuleProvider.GetTypeFieldInfo(Id, fieldName);
+                Symbol fieldType = Module.GetSymbol(fieldInfo.typeId);
 
-                yield return new EngineSymbolProviderSymbolField(this, fieldName, fieldType, fieldTypeAndOffset.Item2);
+                yield return new EngineSymbolProviderSymbolField(this, fieldName, fieldType, fieldInfo.offset);
             }
 
             // Static fields

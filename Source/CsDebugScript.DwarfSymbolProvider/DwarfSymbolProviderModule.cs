@@ -1151,46 +1151,35 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="typeId">The type identifier.</param>
         public string[] GetTypeFieldNames(uint typeId)
         {
-            DwarfSymbol type = GetType(typeId);
-            List<string> names = new List<string>();
+            List<string> fieldNames = new List<string>();
+            DwarfSymbol symbolType = GetType(typeId);
 
-            if (type.Tag == DwarfTag.PointerType)
+            if (symbolType.Children != null)
             {
-                //type = GetType(type);
-            }
-
-            Queue<DwarfSymbol> baseClasses = new Queue<DwarfSymbol>();
-
-            baseClasses.Enqueue(type);
-            while (baseClasses.Count > 0)
-            {
-                type = baseClasses.Dequeue();
-                if (type.Children != null)
+                foreach (DwarfSymbol child in symbolType.Children)
                 {
-                    foreach (DwarfSymbol child in type.Children)
+                    if (child.Tag == DwarfTag.Member && !string.IsNullOrEmpty(child.Name))
                     {
-                        if (child.Tag == DwarfTag.Member && !string.IsNullOrEmpty(child.Name))
+                        if (!child.Attributes.ContainsKey(DwarfAttribute.Artifical) && (!child.Attributes.ContainsKey(DwarfAttribute.External) || !child.Attributes[DwarfAttribute.External].Flag))
                         {
-                            if (!child.Attributes.ContainsKey(DwarfAttribute.Artifical) && (!child.Attributes.ContainsKey(DwarfAttribute.External) || !child.Attributes[DwarfAttribute.External].Flag))
-                            {
-                                names.Add(child.Name);
-                            }
+                            fieldNames.Add(child.Name);
                         }
-                        else if (child.Tag == DwarfTag.Member && string.IsNullOrEmpty(child.Name))
-                        {
-                            // We want to add unnamed unions
-                            DwarfSymbol unionType = GetType(child);
+                    }
+                    else if (child.Tag == DwarfTag.Member && string.IsNullOrEmpty(child.Name))
+                    {
+                        // We want to add unnamed unions
+                        DwarfSymbol unionType = GetType(child);
 
-                            if (unionType.Tag == DwarfTag.UnionType)
-                            {
-                                baseClasses.Enqueue(unionType);
-                            }
+                        if (unionType.Tag == DwarfTag.UnionType)
+                        {
+                            string[] unionFields = GetTypeFieldNames(GetTypeId(unionType));
+                            fieldNames.AddRange(unionFields);
                         }
                     }
                 }
             }
 
-            return names.ToArray();
+            return fieldNames.ToArray();
         }
 
         /// <summary>
@@ -1198,7 +1187,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="fieldName">Name of the field.</param>
-        public Tuple<uint, int> GetTypeFieldTypeAndOffset(uint typeId, string fieldName)
+        public SymbolFieldInfo GetTypeFieldInfo(uint typeId, string fieldName)
         {
             DwarfSymbol type = GetType(typeId);
 
@@ -1225,8 +1214,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                         {
                             uint fieldTypeId = GetTypeId(GetType(child));
                             int offset = DecodeDataMemberLocation(child);
+                            bool isBitField = child.Attributes.ContainsKey(DwarfAttribute.DataBitOffset);
 
-                            return Tuple.Create(fieldTypeId, typeOffset + offset);
+                            return new SymbolFieldInfo(fieldTypeId, typeOffset + offset, isBitField);
                         }
                         else if (child.Tag == DwarfTag.Member && string.IsNullOrEmpty(child.Name))
                         {
@@ -2090,20 +2080,36 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="symbol">Symbol that should have <see cref="DwarfAttribute.DataMemberLocation"/> attribute.</param>
         private int DecodeDataMemberLocation(DwarfSymbol symbol)
         {
-            if (!symbol.Attributes.TryGetValue(DwarfAttribute.DataMemberLocation, out DwarfAttributeValue value))
+            if (symbol.Attributes.TryGetValue(DwarfAttribute.DataMemberLocation, out DwarfAttributeValue value))
             {
-                return 0;
+                Location location = DecodeLocationStatic(value, isDataMemberLocation: true);
+
+                if (location.Type == LocationType.AbsoluteAddress)
+                {
+                    return (int)location.Address;
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
             }
-
-            Location location = DecodeLocationStatic(value, isDataMemberLocation: true);
-
-            if (location.Type == LocationType.AbsoluteAddress)
+            else if (symbol.Attributes.TryGetValue(DwarfAttribute.DataBitOffset, out value))
             {
-                return (int)location.Address;
+                Location location = DecodeLocationStatic(value, isDataMemberLocation: true);
+                location.Address /= 8;
+
+                if (location.Type == LocationType.AbsoluteAddress)
+                {
+                    return (int)location.Address;
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
             }
             else
             {
-                throw new NotImplementedException();
+                return 0;
             }
         }
 
@@ -2983,9 +2989,10 @@ namespace CsDebugScript.DwarfSymbolProvider
 
             foreach (var globalVariable in globalVariables)
             {
-                DwarfSymbol typeSym = GetType(globalVariable.Value);                
+                DwarfSymbol typeSym = GetType(globalVariable.Value);
+                string fileName = System.IO.Path.GetFileName(globalVariable.Value.Parent.Name);
 
-                globalVariableList.Add(Tuple.Create(globalVariable.Key, GetTypeSize(typeSym), GetTypeId(typeSym), ""));            
+                globalVariableList.Add(Tuple.Create(globalVariable.Key, GetTypeSize(typeSym), GetTypeId(typeSym), fileName));            
             }
  
             return globalVariableList;

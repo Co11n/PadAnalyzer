@@ -4,6 +4,23 @@ using System.Collections.Generic;
 namespace CsDebugScript.Engine
 {
     /// <summary>
+    /// 
+    /// </summary>
+    public struct SymbolFieldInfo
+    {
+        public uint typeId;
+        public int offset;
+        public bool isBitField;
+
+        public SymbolFieldInfo(uint inTypeId, int inOffset, bool inIsBitField)
+        {
+            typeId = inTypeId;
+            offset = inOffset;
+            isBitField = inIsBitField;
+        }
+    }
+
+    /// <summary>
     /// Debugging symbol provider for a module.
     /// </summary>
     public interface ISymbolProviderModule
@@ -103,7 +120,7 @@ namespace CsDebugScript.Engine
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="fieldName">Name of the field.</param>
-        Tuple<uint, int> GetTypeFieldTypeAndOffset(uint typeId, string fieldName);
+        SymbolFieldInfo GetTypeFieldInfo(uint typeId, string fieldName);
 
         /// <summary>
         /// Gets the names of static fields of the specified type.

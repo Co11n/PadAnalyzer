@@ -868,7 +868,7 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="fieldName">Name of the field.</param>
-        public Tuple<uint, int> GetTypeFieldTypeAndOffset(uint typeId, string fieldName)
+        public SymbolFieldInfo GetTypeFieldInfo(uint typeId, string fieldName)
         {
             return FixStaFailure(() =>
             {
@@ -888,7 +888,7 @@ namespace CsDebugScript.Engine.SymbolProviders
                         continue;
                     }
 
-                    return Tuple.Create(field.Item2, field.Item3);
+                    return new SymbolFieldInfo(field.Item2, field.Item3, false);
                 }
 
                 throw new Exception("Field not found");

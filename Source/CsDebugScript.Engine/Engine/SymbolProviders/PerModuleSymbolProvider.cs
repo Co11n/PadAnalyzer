@@ -387,7 +387,7 @@ namespace CsDebugScript.Engine.SymbolProviders
 
             SymbolFieldInfo fieldInfo = symbolProviderModule.GetTypeFieldInfo(typeId, fieldName);
 
-            return Tuple.Create(fieldInfo.typeId, fieldName);
+            return Tuple.Create(fieldInfo.typeId, fieldInfo.offset);
         }
 
         /// <summary>

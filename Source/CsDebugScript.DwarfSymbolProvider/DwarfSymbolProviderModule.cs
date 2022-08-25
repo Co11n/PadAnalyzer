@@ -1677,16 +1677,14 @@ namespace CsDebugScript.DwarfSymbolProvider
                                     }
                                 }
                             }
-                            else if (symbol.Tag == DwarfTag.Member && symbol.Attributes.ContainsKey(DwarfAttribute.External)
-                                && symbol.Attributes[DwarfAttribute.External].Flag)
+                            else if (symbol.Tag == DwarfTag.Member &&
+                                     symbol.Attributes.ContainsKey(DwarfAttribute.External) &&
+                                     symbol.Attributes[DwarfAttribute.External].Flag &&
+                                     !string.IsNullOrEmpty(symbol.FullName))
                             {
-                                string fullName = symbol.FullName;
-
-                                if (!string.IsNullOrEmpty(fullName))
-                                {
-                                    globalVariables.TryAdd(fullName, symbol);
-                                }
+                                //globalVariables.TryAdd(symbol.FullName, symbol);
                             }
+                            
                             // Check predicate if we should stop search
                             if (predicate(symbol))
                             {
@@ -2989,10 +2987,12 @@ namespace CsDebugScript.DwarfSymbolProvider
 
             foreach (var globalVariable in globalVariables)
             {
-                DwarfSymbol typeSym = GetType(globalVariable.Value);
-                string fileName = System.IO.Path.GetFileName(globalVariable.Value.Parent.Name);
+                DwarfSymbol variableSymbol = globalVariable.Value;
+                DwarfSymbol variableTypeSymbol = GetType(variableSymbol);
 
-                globalVariableList.Add(Tuple.Create(globalVariable.Key, GetTypeSize(typeSym), GetTypeId(typeSym), fileName));            
+                string fileName = System.IO.Path.GetFileName(variableSymbol.Parent.Name);
+
+                globalVariableList.Add(Tuple.Create(globalVariable.Key, GetTypeSize(variableTypeSymbol), GetTypeId(variableTypeSymbol), fileName));            
             }
  
             return globalVariableList;

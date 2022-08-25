@@ -259,8 +259,8 @@ namespace PadAnalyzer
             }
 
             public string m_name;
-            public uint m_type_id;
-            public string m_type_name;
+            public uint m_typeId;
+            public string m_typeName;
 
             public int m_offset;
             public int m_size;
@@ -398,8 +398,8 @@ namespace PadAnalyzer
                     SymbolInfo info = new SymbolInfo()
                     {
                         m_name = typeName,
-                        m_type_id = typeId,
-                        m_type_name = "",
+                        m_typeId = typeId,
+                        m_typeName = "",
 
                         m_offset = 0,
                         m_size = (int)size,
@@ -428,6 +428,11 @@ namespace PadAnalyzer
 
         private void ProcessChildren(SymbolInfo info, uint typeId)
         {
+            if (info.m_name == "CAkSrcMedia")
+            {
+                int a = 0;
+            }
+
             foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
             {
                 if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))
@@ -443,12 +448,8 @@ namespace PadAnalyzer
 
             foreach (string fieldName in sym.GetTypeFieldNames(typeId))
             {
-                Tuple<uint, int> fieldTypeAndOffset = sym.GetTypeFieldTypeAndOffset(typeId, fieldName);
-
-                if (ProcessChild(fieldName, fieldTypeAndOffset.Item1, fieldTypeAndOffset.Item2, out SymbolInfo childInfo))
-                {
-                    info.AddChild(childInfo);
-                }
+                ProcessChild(typeId, fieldName, out SymbolInfo childInfo);
+                info.AddChild(childInfo);
             }
 
             // Sort children by offset, recalc padding.
@@ -456,7 +457,7 @@ namespace PadAnalyzer
             // The padding value for union/other intergar type symbol will be space for next different offset value 
             if (info.HasChildren())
             {
-                if (sym.GetTypeTag(info.m_type_id) == CsDebugScript.Engine.CodeTypeTag.Enum)
+                if (sym.GetTypeTag(info.m_typeId) == CsDebugScript.Engine.CodeTypeTag.Enum)
                 {
                     foreach (SymbolInfo childInfo in info.m_children)
                     {
@@ -481,10 +482,10 @@ namespace PadAnalyzer
             info = new SymbolInfo()
             {
                 m_name = "Base: " + typeName,
-                m_type_id = typeId,
+                m_typeId = typeId,
                 m_size = (int)typeSize,
                 m_offset = memOffset,
-                m_type_name = typeName
+                m_typeName = typeName
             };
 
             SymbolInfo typeInfo = TryAddSymbol(typeId);
@@ -497,22 +498,29 @@ namespace PadAnalyzer
             return true;
         }
 
-        private bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
+        private void ProcessChild(uint typeId, string fieldName, out SymbolInfo info)
         {
+            CsDebugScript.Engine.SymbolFieldInfo fieldInfo = sym.GetTypeFieldInfo(typeId, fieldName);
+
+            string fieldNameFinal = fieldName;
+
+            if (fieldInfo.isBitField)
+            {
+                fieldNameFinal = "Bitfield: " + fieldNameFinal;
+            }
+
             info = new SymbolInfo()
             {
-                m_name = fieldName,
-                m_type_id = typeId,
-                m_type_name = sym.GetTypeName(typeId),
+                m_name = fieldNameFinal,
+                m_typeId = fieldInfo.typeId,
+                m_typeName = sym.GetTypeName(fieldInfo.typeId),
 
-                m_offset = memOffset,
-                m_size = (int)sym.GetTypeSize(typeId),
-                m_padding = 0
+                m_offset = fieldInfo.offset,
+                m_size = (int)sym.GetTypeSize(fieldInfo.typeId),
+                m_padding = 0,
             };
 
-            TryAddSymbol(typeId);
-
-            return true;
+            TryAddSymbol(info.m_typeId);
         }
 
         private SymbolInfo FindSelectedSymbolInfo()
@@ -604,7 +612,7 @@ namespace PadAnalyzer
             foreach (SymbolInfo child in info.m_children)
             {
                 // Present child info
-                string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_type_name };
+                string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_typeName };
                 dataGridViewSymbolInfo.Rows.Add(row);
 
                 // Present child padding info
@@ -660,6 +668,14 @@ namespace PadAnalyzer
             }
         }
 
+        private void SetRowColor(DataGridViewRow inRow, Color inColor)
+        {
+            inRow.Cells[0].Style.BackColor = inColor;
+            inRow.Cells[1].Style.BackColor = inColor;
+            inRow.Cells[2].Style.BackColor = inColor;
+            inRow.Cells[3].Style.BackColor = inColor;
+        }
+
         private void DataGridViewSymbolInfo_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
             foreach (DataGridViewRow row in dataGridViewSymbolInfo.Rows)
@@ -668,17 +684,16 @@ namespace PadAnalyzer
 
                 if (cell.Value.ToString().StartsWith("Padding"))
                 {
-                    cell.Style.BackColor = Color.LightGray;
-                    row.Cells[1].Style.BackColor = Color.LightGray;
-                    row.Cells[2].Style.BackColor = Color.LightGray;
-                    row.Cells[3].Style.BackColor = Color.LightGray;
+                    SetRowColor(row, Color.LightGray);
                 }
                 else if (cell.Value.ToString().IndexOf("Base: ") == 0)
                 {
-                    cell.Style.BackColor = Color.LightGreen;
-                    row.Cells[1].Style.BackColor = Color.LightGreen;
-                    row.Cells[2].Style.BackColor = Color.LightGreen;
-                    row.Cells[3].Style.BackColor = Color.LightGreen;
+                    SetRowColor(row, Color.LightGreen);
+                }
+                else if (cell.Value.ToString().IndexOf("Bitfield: ") == 0)
+                {
+                    SetRowColor(row, Color.BlueViolet);
+                    cell.Style.BackColor = Color.BlueViolet;
                 }
                 else if (cell.Value.ToString().IndexOf("Cacheline boundary") >= 0)
                 {
@@ -686,17 +701,11 @@ namespace PadAnalyzer
 
                     if (cellType.Value.ToString().IndexOf("Intesects cacheline") == 0)
                     {
-                        cell.Style.BackColor = Color.OrangeRed;
-                        row.Cells[1].Style.BackColor = Color.OrangeRed;
-                        row.Cells[2].Style.BackColor = Color.OrangeRed;
-                        row.Cells[3].Style.BackColor = Color.OrangeRed;
+                        SetRowColor(row, Color.OrangeRed);
                     }
                     else
                     {
-                        cell.Style.BackColor = Color.LightPink;
-                        row.Cells[1].Style.BackColor = Color.LightPink;
-                        row.Cells[2].Style.BackColor = Color.LightPink;
-                        row.Cells[3].Style.BackColor = Color.LightPink;
+                        SetRowColor(row, Color.LightPink);
                     }
                 }
             }
@@ -832,15 +841,15 @@ namespace PadAnalyzer
             {
                 foreach (SymbolInfo info in m_symbols.Values)
                 {
-                    string[] staticFieldsList = sym.GetTypeStaticFieldNames(info.m_type_id);
+                    string[] staticFieldsList = sym.GetTypeStaticFieldNames(info.m_typeId);
 
                     foreach(string staticFieldName in staticFieldsList)
                     {
                         // Type info
-                        string typeName = sym.GetTypeName(info.m_type_id);
+                        string typeName = sym.GetTypeName(info.m_typeId);
 
                         // Static fields info
-                        Tuple<uint, ulong> fieldInfo = sym.GetTypeStaticFieldTypeAndAddress(info.m_type_id, staticFieldName);
+                        Tuple<uint, ulong> fieldInfo = sym.GetTypeStaticFieldTypeAndAddress(info.m_typeId, staticFieldName);
                         uint staticFieldTypeId = fieldInfo.Item1;
                         string staticFieldType = sym.GetTypeName(staticFieldTypeId);
                         uint staticFieldSize = sym.GetTypeSize(staticFieldTypeId);

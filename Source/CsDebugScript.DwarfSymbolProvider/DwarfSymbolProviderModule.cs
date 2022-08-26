@@ -1650,8 +1650,6 @@ namespace CsDebugScript.DwarfSymbolProvider
                             }
 
                             // If it is global variable, add it to collection
-
-                            // My code here
                             if (symbol.Children != null)
                             {
                                 foreach (var child in symbol.Children)
@@ -1665,15 +1663,14 @@ namespace CsDebugScript.DwarfSymbolProvider
 
                             if (symbol.Tag == DwarfTag.Variable)
                             {
-                                string fullName = symbol.FullName;
-
-                                if (!string.IsNullOrEmpty(fullName) && symbol.Attributes.TryGetValue(DwarfAttribute.Location, out DwarfAttributeValue locationAttributeValue))
+                                if (!string.IsNullOrEmpty(symbol.FullName) && 
+                                    symbol.Attributes.TryGetValue(DwarfAttribute.Location, out DwarfAttributeValue locationAttributeValue))
                                 {
                                     Location location = DecodeLocation(locationAttributeValue);
 
                                     if (location.Type == LocationType.AbsoluteAddress)
                                     {
-                                        globalVariables.TryAdd(fullName, symbol);
+                                        globalVariables.TryAdd(symbol.FullName, symbol);
                                     }
                                 }
                             }

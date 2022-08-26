@@ -406,16 +406,11 @@ namespace PadAnalyzer
                         m_padding = 0,
                     };
 
-                    m_symbols[info.m_name] = info;
-
                     ProcessChildren(info, typeId);
+                    m_symbols[info.m_name] = info;
+                }
 
-                    return info;
-                }
-                else
-                {
-                    return m_symbols[typeName];
-                }
+                return m_symbols[typeName];
             }
 
             return null;

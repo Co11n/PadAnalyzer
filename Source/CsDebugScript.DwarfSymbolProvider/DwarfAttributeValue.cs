@@ -128,7 +128,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         {
             get
             {
-                return (string)Value;
+                return Value.ToString();
             }
         }
 

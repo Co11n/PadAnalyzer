@@ -47,18 +47,20 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <param name="debugData">The debug data.</param>
         /// <param name="debugDataDescription">The debug data description.</param>
         /// <param name="debugStrings">The debug strings.</param>
+        /// <param name="debugStringOffsets"></param>
         /// <param name="addressNormalizer">Normalize address delegate (<see cref="NormalizeAddressDelegate"/>)</param>
-        private void ReadData(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings, DwarfMemoryReader debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
+        private void ReadData(DwarfMemoryReader debugData, DwarfMemoryReader debugDataDescription, DwarfMemoryReader debugStrings,
+                              DwarfMemoryReader debugStringOffsets, NormalizeAddressDelegate addressNormalizer)
         {
-            // Read header
-            bool is64bit;
-            int beginPosition = debugData.Position;
-            ulong length = debugData.ReadLength(out is64bit);
-            int endPosition = debugData.Position + (int)length;
-            ushort version = debugData.ReadUshort();
             int debugDataDescriptionOffset;
             byte addressSize;
             byte UnitType = 1; //DW_UT_compile
+
+            // Read header
+            int beginPosition = debugData.Position;
+            ulong length = debugData.ReadLength(out bool is64bit);
+            int endPosition = debugData.Position + (int)length;
+            ushort version = debugData.ReadUshort();
 
             if (version >= 5)
             {
@@ -72,7 +74,10 @@ namespace CsDebugScript.DwarfSymbolProvider
                 addressSize = debugData.ReadByte();
             }
 
-            if (UnitType != 1) return;
+            if (UnitType != 1)
+            {
+                return;
+            }
 
             DataDescriptionReader dataDescriptionReader = new DataDescriptionReader(debugDataDescription, debugDataDescriptionOffset);
 
@@ -84,9 +89,8 @@ namespace CsDebugScript.DwarfSymbolProvider
             ulong unitStringOffsetsBase = 0;
             ulong unitStringOffsetsSize = 0;
 
-            while (debugData.Position < endPosition)
+            for (int dataPosition = debugData.Position; debugData.Position < endPosition; dataPosition = debugData.Position)
             {
-                int dataPosition = debugData.Position;
                 uint code = debugData.LEB128();
 
                 if (code == 0)
@@ -113,8 +117,6 @@ namespace CsDebugScript.DwarfSymbolProvider
                     DwarfAttribute attribute = descriptionAttribute.Attribute;
                     DwarfFormat format = descriptionAttribute.Format;
                     DwarfAttributeValue attributeValue = new DwarfAttributeValue();
-
-
 
                     switch (format)
                     {
@@ -263,12 +265,15 @@ namespace CsDebugScript.DwarfSymbolProvider
                         unitStringOffsetsSize = ContributionSize;
                     }
 
-
                     bool skipAttribute = true;
+
                     if (attribute == DwarfAttribute.Name || 
                         attribute == DwarfAttribute.ByteSize ||
                         attribute == DwarfAttribute.Type ||
                         attribute == DwarfAttribute.DataMemberLocation ||
+                        attribute == DwarfAttribute.External ||
+                        attribute == DwarfAttribute.DataBitOffset ||
+                        attribute == DwarfAttribute.BitSize ||
                         // for inheritance
                         attribute == DwarfAttribute.Virtuality ||
                         // for array
@@ -278,15 +283,16 @@ namespace CsDebugScript.DwarfSymbolProvider
                         skipAttribute = false;
                     }
 
+                    if (skipAttribute)
+                    {
+                        continue;
+                    }
+
                     if (attribute == DwarfAttribute.Declaration)
                     {
                         skipSymbol = true;
                     }
 
-                    if (skipAttribute)
-                    {
-                        continue;
-                    }
                     if (attribute == DwarfAttribute.Count && attributeValue.Type != DwarfAttributeValueType.Constant)
                     {
                         attributeValue.Type = DwarfAttributeValueType.Constant;
@@ -305,7 +311,6 @@ namespace CsDebugScript.DwarfSymbolProvider
                     }
                 }
 
-
                 if (description.Tag != DwarfTag.BaseType &&
                     description.Tag != DwarfTag.Typedef &&
                     description.Tag != DwarfTag.PointerType &&
@@ -318,7 +323,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                     description.Tag != DwarfTag.Inheritance &&
                     description.Tag != DwarfTag.Member &&
                     description.Tag != DwarfTag.CompileUnit &&
-                    description.Tag != DwarfTag.Namespace)
+                    description.Tag != DwarfTag.Namespace &&
+                    description.Tag != DwarfTag.Variable
+                    )
                 {
                     skipSymbol = true;
                 }
@@ -327,9 +334,11 @@ namespace CsDebugScript.DwarfSymbolProvider
                 {
                     if (!attributes.ContainsKey(DwarfAttribute.ByteSize))
                     {
-                        DwarfAttributeValue attributeValue = new DwarfAttributeValue();
-                        attributeValue.Type = DwarfAttributeValueType.Constant;
-                        attributeValue.Value = (ulong)8;
+                        DwarfAttributeValue attributeValue = new DwarfAttributeValue
+                        {
+                            Type = DwarfAttributeValueType.Constant,
+                            Value = (ulong)8
+                        };
 
                         attributes.Add(DwarfAttribute.ByteSize, attributeValue);
                     }
@@ -400,11 +409,9 @@ namespace CsDebugScript.DwarfSymbolProvider
                     {
                         if (value.Type == DwarfAttributeValueType.Reference)
                         {
-                            DwarfSymbol reference;
-
                             value.Type = DwarfAttributeValueType.ResolvedReference;
 
-                            if (symbolsByOffset.TryGetValue((int)value.Address, out reference))
+                            if (symbolsByOffset.TryGetValue((int)value.Address, out DwarfSymbol reference))
                             {
                                 value.Value = reference;
                             }
@@ -510,9 +517,7 @@ namespace CsDebugScript.DwarfSymbolProvider
             /// <param name="findCode">The code to be found.</param>
             public DataDescription GetDebugDataDescription(uint findCode)
             {
-                DataDescription result;
-
-                if (readDescriptions.TryGetValue(findCode, out result))
+                if (readDescriptions.TryGetValue(findCode, out DataDescription result))
                 {
                     return result;
                 }

@@ -4,6 +4,23 @@ using System.Collections.Generic;
 namespace CsDebugScript.Engine
 {
     /// <summary>
+    /// 
+    /// </summary>
+    public struct SymbolFieldInfo
+    {
+        public uint typeId;
+        public int offset;
+        public bool isBitField;
+
+        public SymbolFieldInfo(uint inTypeId, int inOffset, bool inIsBitField)
+        {
+            typeId = inTypeId;
+            offset = inOffset;
+            isBitField = inIsBitField;
+        }
+    }
+
+    /// <summary>
     /// Debugging symbol provider for a module.
     /// </summary>
     public interface ISymbolProviderModule
@@ -37,7 +54,7 @@ namespace CsDebugScript.Engine
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         uint GetTypeSize(uint typeId);
-
+       
         /// <summary>
         /// Gets the type identifier.
         /// </summary>
@@ -103,7 +120,7 @@ namespace CsDebugScript.Engine
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="fieldName">Name of the field.</param>
-        Tuple<uint, int> GetTypeFieldTypeAndOffset(uint typeId, string fieldName);
+        SymbolFieldInfo GetTypeFieldInfo(uint typeId, string fieldName);
 
         /// <summary>
         /// Gets the names of static fields of the specified type.
@@ -221,6 +238,12 @@ namespace CsDebugScript.Engine
         bool HasTypeVTable(uint typeId);
 
         /// <summary>
+        /// Get the pointer of VTable type
+        /// </summary>
+        /// <returns></returns>
+        ulong GetPointerVTableSize(uint typeId);
+
+        /// <summary>
         /// Gets the global scope type id.
         /// </summary>
         uint GetGlobalScope();
@@ -229,6 +252,12 @@ namespace CsDebugScript.Engine
         /// Gets path to the symbols file or <c>null</c> if we don't have symbols.
         /// </summary>
         string GetSymbolsPath();
+
+        /// <summary>
+        /// Get List of global variables symbols
+        /// </summary>
+        /// <returns></returns>
+        List<Tuple<string, uint, uint, string>> GetGlobalVariablesInfo();
         #endregion
     }
 }

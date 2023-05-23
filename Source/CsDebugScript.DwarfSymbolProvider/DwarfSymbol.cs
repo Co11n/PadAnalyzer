@@ -39,9 +39,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         {
             get
             {
-                DwarfAttributeValue nameValue;
-
-                if (Attributes.TryGetValue(DwarfAttribute.Name, out nameValue))
+                if (Attributes.TryGetValue(DwarfAttribute.Name, out DwarfAttributeValue nameValue))
                 {
                     return nameValue.String;
                 }
@@ -87,9 +85,7 @@ namespace CsDebugScript.DwarfSymbolProvider
         /// <returns>Attribute value if available; default value otherwise</returns>
         public ulong GetConstantAttribute(DwarfAttribute attribute, ulong defaultValue = 0)
         {
-            DwarfAttributeValue value;
-
-            if (Attributes.TryGetValue(attribute, out value))
+            if (Attributes.TryGetValue(attribute, out DwarfAttributeValue value))
             {
                 return value.Constant;
             }

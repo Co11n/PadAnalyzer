@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 
 
@@ -14,13 +13,10 @@ namespace PadAnalyzer
         public PadAnalyzer()
         {
             InitializeComponent();
-            m_table = CreateDataTable();
-            bindingSourceSymbols.DataSource = m_table;
-            dataGridSymbols.DataSource = bindingSourceSymbols;
-
-            dataGridSymbols.Columns[0].Width = 271;
-            progressBar.Maximum = progressBar.Width;
-
+            
+            ResetDataTable();
+            CreateDataTableColumns(m_table, TableViewTypes.ClassFieldData);
+            
             string[] arguments = Environment.GetCommandLineArgs();
 
             if (arguments.Length == 2)
@@ -32,261 +28,219 @@ namespace PadAnalyzer
             }
         }
 
-        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
+        enum TableViewTypes
         {
-            this.Close();
-        }
+            NoneType = 0,
+            ClassFieldData,
+            ClassStaticData,
+            GlobalStaticData
+        };
 
-        String currentFileName;
-        private void loadPDBToolStripMenuItem_Click(object sender, EventArgs e)
+        class PaddingCalculation
         {
-            if (bgWorker.IsBusy)
+            private SymbolInfo typeSymbol = null;
+
+            private SymbolInfo currentChild = null;
+            private int currentIndex = 0;
+            private int nextChildOffset = 0;
+            private int unnamedUnionStartIndex = -1;
+
+            private List<Tuple<int, int>> paddingList = new List<Tuple<int, int>>();
+
+            /// <summary>
+            /// Update Child State with i child
+            /// </summary>
+            /// <param name="i"></param>
+            private void UpdateChildState(int i)
             {
-                return;
+                currentIndex = i;
+
+                currentChild = typeSymbol.m_children[currentIndex];
+                nextChildOffset = typeSymbol.m_children[i + 1].m_offset;
             }
 
-            if (openPdbDialog.ShowDialog() == DialogResult.OK)
+            /// <summary>
+            /// Sets the final child and the next child offset as type size
+            /// </summary>
+            private void SetFinalState()
             {
-                progressBar.Value = 0;
-                currentFileName = System.IO.Path.GetFileName(openPdbDialog.FileName);
-                this.Text = "Pad Analyzer: Loading " + currentFileName;
-                bgWorker.RunWorkerAsync(openPdbDialog.FileName);
-            }
-        }
+                currentIndex = typeSymbol.m_children.Count - 1;
 
-        DataTable CreateDataTable()
-        {
-            DataTable table = new DataTable("Symbols");
-
-            DataColumn column = new DataColumn();
-            column.ColumnName = "Symbol";
-            column.ReadOnly = true;
-            table.Columns.Add(column);
-            column = new DataColumn();
-            column.ColumnName = "Size";
-            column.ReadOnly = true;
-            column.DataType = System.Type.GetType("System.Int32");
-            table.Columns.Add(column);
-            column = new DataColumn();
-            column.ColumnName = "Padding";
-            column.ReadOnly = true;
-            column.DataType = System.Type.GetType("System.Int32");
-            table.Columns.Add(column);
-            column = new DataColumn();
-            column.ColumnName = "Padding/Size";
-            column.ReadOnly = true;
-            column.DataType = System.Type.GetType("System.Double");
-            table.Columns.Add(column);
-
-            return table;
-        }
-
-        CsDebugScript.Engine.ISymbolProviderModule sym;
-
-        void PopulateDataTable(string fileName)
-        {
-            m_symbols.Clear();
-
-            if (fileName.ToLower().EndsWith(".pdb"))
-            {
-                CsDebugScript.Engine.SymbolProviders.DiaSymbolProvider dw = new CsDebugScript.Engine.SymbolProviders.DiaSymbolProvider();
-                sym = dw.LoadModule(fileName);
-            }
-            else
-            {
-                CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider dw = new CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider();
-                sym = dw.LoadModule(fileName);
+                currentChild = typeSymbol.m_children[currentIndex];
+                nextChildOffset = (int)typeSymbol.m_size;
             }
 
-            try
+            /// <summary>
+            /// Calculate padding for base class
+            /// </summary>
+            private void CalculatePaddingForBaseClass()
             {
-            }
-            catch (System.Runtime.InteropServices.COMException exc)
-            {
-                MessageBox.Show(this, exc.ToString());
-                return;
-            }
+                int realChildSize = nextChildOffset - currentChild.m_offset;
 
-            foreach (uint typeId in sym.GetAllTypes())
-            {
-                TryAddSymbol(typeId);
-            }
-
-            /*
-            IDiaEnumSymbols allSymbols;
-            m_session.findChildren(m_session.globalScope, SymTagEnum.SymTagUDT, null, 0, out allSymbols);
-
-            ulong cacheLineSize = GetCacheLineSize();
-
-            nSymbols = allSymbols.Count;
-            symIdx = 0;
-            symStep = nSymbols / progressBar.Maximum;
-
-            foreach (IDiaSymbol sym in allSymbols)
-            {
-                symIdx++;
-
-                if (symIdx % symStep == 0)
+                if (realChildSize <= currentChild.m_size)
                 {
-                    bgWorker.ReportProgress(symIdx * progressBar.Maximum / nSymbols);
-                }
-
-                TryAddSymbol(sym);
-            }
-            */
-        }
-
-        int nSymbols;
-        int symIdx;
-        int symStep;
-
-        SymbolInfo TryAddSymbol(uint typeId)
-        {
-            string name = sym.GetTypeName(typeId);
-
-            uint size = sym.GetTypeSize(typeId);
-            if (size > 0 && name != null)
-            {
-                if (!m_symbols.ContainsKey(name))
-                {
-                    SymbolInfo info = new SymbolInfo();
-                    info.Set(name, (int)size, 0, "");
-                    m_symbols.Add(info.m_name, info);
-
-                    ProcessChildren(info, typeId);
-                    return info;
+                    currentChild.m_size = realChildSize;
+                    currentChild.m_padding = 0;
                 }
                 else
                 {
-                    return m_symbols[name];
+                    currentChild.m_padding = realChildSize - currentChild.m_size;
+                }
+
+                typeSymbol.m_padding += currentChild.m_padding;
+            }
+
+            /// <summary>
+            /// The class for compare padding tupples
+            /// </summary>
+            private class PaddingOffsetComparer : IComparer<Tuple<int, int>>
+            {
+                public int Compare(Tuple<int, int> x, Tuple<int, int> y)
+                {
+                    if (x.Item1 > y.Item1)
+                    {
+                        return 1;
+                    }
+
+                    return -1;                    
                 }
             }
 
-            return null;
-        }
-
-        ulong GetCacheLineSize()
-        {
-            return Convert.ToUInt32(textBoxCache.Text);
-        }
-
-        void ProcessChildren(SymbolInfo info, uint typeId)
-        {
-            foreach (string fieldName in sym.GetTypeFieldNames(typeId))
+            /// <summary>
+            /// Calculated padding of current child
+            /// </summary>
+            /// <param name="info"></param>
+            /// <param name="currentChild"></param>
+            private void CalculateChildPadding()
             {
-                Tuple<uint, int> fieldTypeAndOffset = sym.GetTypeFieldTypeAndOffset(typeId, fieldName);
-
-                SymbolInfo childInfo;
-                if (ProcessChild(fieldName, fieldTypeAndOffset.Item1, fieldTypeAndOffset.Item2, out childInfo))
-                    info.AddChild(childInfo);
-            }
-
-            foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
-            {
-                SymbolInfo childInfo;
-                if (ProcessBase(baseClass.Item1, baseClass.Item2, out childInfo))
-                    info.AddChild(childInfo);
-            }
-
-
-            // Sort children by offset, recalc padding.
-            // Sorting is not needed normally (for data fields), but sometimes base class order is wrong.
-            if (info.HasChildren())
-            {
-                info.m_children.Sort(SymbolInfo.CompareOffsets);
-                for (int i = 0; i < info.m_children.Count; ++i)
+                if (currentChild.IsBase())
                 {
-                    SymbolInfo child = info.m_children[i];
-                    int next_ofs;
-
-                    if (i < info.m_children.Count - 1)
+                    CalculatePaddingForBaseClass();
+                }
+                else
+                {
+                    if (currentChild.m_offset >= nextChildOffset)
                     {
-                        next_ofs = info.m_children[i + 1].m_offset;
+                        if (unnamedUnionStartIndex == -1)
+                        {
+                            unnamedUnionStartIndex = currentIndex;
+                        }
                     }
                     else
                     {
-                        next_ofs = info.m_size;
-                    }
+                        currentChild.m_padding = (nextChildOffset - currentChild.m_offset) - currentChild.m_size;
 
-                    int pad = (next_ofs - (int)child.m_offset) - child.m_size;
-                    if (pad < 0)
-                    {
-                        pad = 0;
+                        if (currentChild.m_padding > 0)
+                        {
+                            int paddingStartOffset = currentChild.m_offset + currentChild.m_size;
+
+                            paddingList.Add(Tuple.Create(paddingStartOffset, paddingStartOffset + currentChild.m_padding));
+                        }
                     }
-                    child.m_padding += pad;
-                    info.m_padding += child.m_padding;
                 }
             }
-        }
 
-        readonly string[] baseTypes = { "none", "void", "char", "wchar", "4", "5", "int", "uint", "float", "BCD", "bool", "11", "12", "long", "ulong" };
-
-
-        bool ProcessBase(uint typeId, int memOffset, out SymbolInfo info)
-        {
-            string typeName = sym.GetTypeName(typeId);
-            ulong typeSize = sym.GetTypeSize(typeId);
-
-            info = new SymbolInfo();
-
-            SymbolInfo typeInfo = null;
-            int count = 1;
-
-            typeInfo = TryAddSymbol(typeId);
-
-            if (typeInfo != null)
+            /// <summary>
+            /// Calculates the padding of typeSymbol
+            /// </summary>
+            private void CorrectPaddingCalculation()
             {
-                info.m_padding += typeInfo.m_padding * count;
-            }
-
-            info.Set("Base: " + typeName, (int)typeSize, memOffset, typeName);
-
-            return true;
-        }
-
-        bool ProcessChild(string fieldName, uint typeId, int memOffset, out SymbolInfo info)
-        {
-            string symbolName = sym.GetTypeName(typeId);
-
-            info = new SymbolInfo();
-
-            ulong len = sym.GetTypeSize(typeId);
-            if (symbolName != null)
-            {
-
-                SymbolInfo typeInfo = null;
-                int count = 1;
-
-                typeInfo = TryAddSymbol(typeId);
-
-                if (typeInfo != null)
+                if (unnamedUnionStartIndex != -1)
                 {
-                    info.m_padding += typeInfo.m_padding * count;
+                    PaddingOffsetComparer paddingOffsetComparer = new PaddingOffsetComparer();
+                    paddingList.Sort(paddingOffsetComparer);
+
+                    int offsetIndex;
+                    Tuple<int, int> dymmySearchObject = null;
+                    int boundFieldOffset;
+
+                    for (int i = unnamedUnionStartIndex; i < typeSymbol.m_children.Count; ++i)
+                    {
+                        dymmySearchObject = Tuple.Create(typeSymbol.m_children[i].m_offset, 0);
+
+                        offsetIndex = paddingList.BinarySearch(dymmySearchObject, paddingOffsetComparer);
+                        offsetIndex = (offsetIndex < 0) ? ~offsetIndex : offsetIndex;
+
+                        boundFieldOffset = typeSymbol.m_children[i].m_offset + typeSymbol.m_children[i].m_size;
+                        int cnt = paddingList.Count;
+
+                        for (int j = offsetIndex; j < cnt; ++j)
+                        {
+                            if (paddingList[j].Item2 < boundFieldOffset)
+                            {
+                                paddingList.RemoveAt(j);
+                                cnt--;
+                            }
+                            else
+                            {
+                                if (paddingList[j].Item1 < boundFieldOffset)
+                                {
+                                    paddingList[j] = Tuple.Create(boundFieldOffset, paddingList[j].Item2);
+                                }
+                            }
+                        }
+
+                    }
+                }
+
+                for (int i = 0; i < paddingList.Count; ++i)
+                {
+                    typeSymbol.m_padding += (paddingList[i].Item2 - paddingList[i].Item1);
                 }
             }
 
-            info.Set(fieldName, (int)len, memOffset, symbolName);
+            /// <summary>
+            /// Initialize the PaddingCalculation class with symbol type
+            /// </summary>
+            /// <param name="inSym"></param>
+            public void Initialize(SymbolInfo inSym)
+            {
+                typeSymbol = inSym;
+                currentIndex = 0;
+            }
 
-            return true;
+            /// <summary>
+            /// Runs the paddings calculations for typeSymbol children
+            /// </summary>
+            public void Run()
+            {
+                int lastChildIndex = typeSymbol.m_children.Count - 1;
+
+                for (int i = 0; i < lastChildIndex; ++i)
+                {
+                    UpdateChildState(i);
+                    CalculateChildPadding();
+                }
+
+                SetFinalState();
+                CalculateChildPadding();
+
+                CorrectPaddingCalculation();
+            }
+
         }
+
+        Dictionary<string, TableViewTypes> dictViewTableTypes =
+            new Dictionary<string, TableViewTypes>()
+        {
+            {"Class field data", TableViewTypes.ClassFieldData},
+            {"Class static field data", TableViewTypes.ClassStaticData},
+            {"Global static data", TableViewTypes.GlobalStaticData}
+        };
 
         class SymbolInfo
         {
-            public void Set(string name, int size, int offset, string type_name)
-            {
-                m_name = name;
-                m_type_name = type_name;
-                m_size = size;
-                m_offset = offset;
-            }
-
             public bool HasChildren() { return m_children != null; }
             public void AddChild(SymbolInfo child)
             {
                 if (m_children == null)
+                {
                     m_children = new List<SymbolInfo>();
+                }
+
                 m_children.Add(child);
             }
+
             public bool IsBase()
             {
                 return m_name.IndexOf("Base: ") == 0;
@@ -305,89 +259,402 @@ namespace PadAnalyzer
             }
 
             public string m_name;
-            public string m_type_name;
-            public int m_size;
+            public uint m_typeId;
+            public string m_typeName;
+
             public int m_offset;
+            public int m_size;
             public int m_padding = 0;
+
             public List<SymbolInfo> m_children;
         };
 
-        SymbolInfo FindSelectedSymbolInfo()
+        CsDebugScript.Engine.ISymbolProviderModule sym;
+
+        readonly string[] baseTypes = { "none", "void", "char", "wchar", "4", "5", "int", "uint", "float", "BCD", "bool", "11", "12", "long", "ulong" };
+
+        Dictionary<string, SymbolInfo> m_symbols = new Dictionary<string, SymbolInfo>();
+
+        DataTable m_table = null;
+
+        long m_prefetchStartOffset = 0;
+
+        String currentFileName;
+
+        /// <summary>
+        /// Function to calculate tables column width
+        /// </summary>
+        private void SetColumnSizeEquel(object sender, EventArgs e)
+        {
+            for (int i = 0; i < dataGridSymbols.Columns.Count; ++i)
+            {
+                dataGridSymbols.Columns[i].Width = dataGridSymbols.Width / dataGridSymbols.Columns.Count;
+            }
+
+            for (int i = 0; i < dataGridViewSymbolInfo.Columns.Count; ++i)
+            {
+                dataGridViewSymbolInfo.Columns[i].Width = dataGridViewSymbolInfo.Width / dataGridViewSymbolInfo.Columns.Count;
+            }
+        }
+
+        private void ExitToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void LoadPDBToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (IsDataTableBusy())
+            {
+                MessageBox.Show("Cannot load new file. Table is still processing.");
+                return;
+            }
+
+            if (openPdbDialog.ShowDialog() == DialogResult.OK)
+            {
+                currentFileName = System.IO.Path.GetFileName(openPdbDialog.FileName);
+
+                // Prepare GUI
+                this.textBoxFilter.Text = "";
+                progressBar.Value = 0;
+                this.Text = "Pad Analyzer: Loading " + currentFileName;
+                this.tablePresentationComboBox.Enabled = false;
+                this.tablePresentationComboBox.Text = "Class field data";
+
+                ResetDataTable();
+                CreateDataTableColumns(m_table, TableViewTypes.ClassFieldData);
+
+                bgWorker.RunWorkerAsync(openPdbDialog.FileName);
+            }
+        }
+
+        private void CreateDataTableColumns(DataTable table, TableViewTypes tableType)
+        {
+            Dictionary<string, Type> columnNames = new Dictionary<string, Type>();
+            
+            if (tableType == TableViewTypes.ClassFieldData)
+            {
+                columnNames["Symbol"] = Type.GetType("System.String");
+                columnNames["Size"] = Type.GetType("System.Int32");
+                columnNames["Padding"] = Type.GetType("System.Int32");
+                columnNames["Padding/Size"] = Type.GetType("System.Double");                
+            }
+            else if (tableType == TableViewTypes.ClassStaticData || tableType == TableViewTypes.GlobalStaticData)
+            {
+                columnNames["Symbol"] = Type.GetType("System.String");
+                columnNames["Size"] = Type.GetType("System.Int32");
+                columnNames["Type"] = Type.GetType("System.String");
+                columnNames["Object file"] = Type.GetType("System.String");
+            }
+            else
+            {
+                throw new ArgumentException("Not correct parameter", nameof(tableType));
+            }
+
+            foreach (string columnName in columnNames.Keys)
+            {
+                DataColumn column = new DataColumn()
+                {
+                    ColumnName = columnName,
+                    DataType = columnNames[columnName],
+                    ReadOnly = true
+                };
+
+                table.Columns.Add(column);
+            }
+        }
+
+        private void PopulateDataTable(string fileName)
+        {
+            m_symbols.Clear();
+
+            if (fileName.ToLower().EndsWith(".pdb"))
+            {
+                CsDebugScript.Engine.SymbolProviders.DiaSymbolProvider dw = new CsDebugScript.Engine.SymbolProviders.DiaSymbolProvider();
+                sym = dw.LoadModule(fileName);
+            }
+            else
+            {
+                CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider dw = new CsDebugScript.DwarfSymbolProvider.DwarfSymbolProvider();
+                sym = dw.LoadModule(fileName);
+            }
+
+            foreach (uint typeId in sym.GetAllTypes())
+            {
+                TryAddSymbol(typeId);
+            }
+        }
+
+        private SymbolInfo TryAddSymbol(uint typeId)
+        {
+            uint size = sym.GetTypeSize(typeId);
+
+            if (size > 0)
+            {
+                string typeName = sym.GetTypeName(typeId);
+
+                if (!m_symbols.ContainsKey(typeName))
+                {
+                    SymbolInfo info = new SymbolInfo()
+                    {
+                        m_name = typeName,
+                        m_typeId = typeId,
+                        m_typeName = "",
+
+                        m_offset = 0,
+                        m_size = (int)size,
+                        m_padding = 0,
+                    };
+
+                    ProcessChildren(info, typeId);
+                    m_symbols[info.m_name] = info;
+                }
+
+                return m_symbols[typeName];
+            }
+
+            return null;
+        }
+
+        private ulong GetCacheLineSize()
+        {
+            return Convert.ToUInt32(textBoxCache.Text);
+        }
+
+        private void ProcessChildren(SymbolInfo info, uint typeId)
+        {
+            if (info.m_name == "CAkSrcMedia")
+            {
+                int a = 0;
+            }
+
+            foreach (Tuple<uint, int> baseClass in sym.GetTypeDirectBaseClasses(typeId).Values)
+            {
+                if (ProcessBase(baseClass.Item1, baseClass.Item2, out SymbolInfo childInfo))
+                {
+                    info.AddChild(childInfo);
+                }
+            }
+
+            if (info.HasChildren())
+            {
+                info.m_children.Sort(SymbolInfo.CompareOffsets);
+            }
+
+            foreach (string fieldName in sym.GetTypeFieldNames(typeId))
+            {
+                ProcessChild(typeId, fieldName, out SymbolInfo childInfo);
+                info.AddChild(childInfo);
+            }
+
+            // Sort children by offset, recalc padding.
+            // Sorting is not needed normally (for data fields), but sometimes base class order is wrong.
+            // The padding value for union/other intergar type symbol will be space for next different offset value 
+            if (info.HasChildren())
+            {
+                if (sym.GetTypeTag(info.m_typeId) == CsDebugScript.Engine.CodeTypeTag.Enum)
+                {
+                    foreach (SymbolInfo childInfo in info.m_children)
+                    {
+                        childInfo.m_padding = 0;
+                    }
+
+                    return;
+                }
+
+                PaddingCalculation processingSymbolState = new PaddingCalculation();
+
+                processingSymbolState.Initialize(info);
+                processingSymbolState.Run();
+            }
+        }
+
+        private bool ProcessBase(uint typeId, int memOffset, out SymbolInfo info)
+        {
+            string typeName = sym.GetTypeName(typeId);
+            uint typeSize = sym.GetTypeSize(typeId);
+
+            info = new SymbolInfo()
+            {
+                m_name = "Base: " + typeName,
+                m_typeId = typeId,
+                m_size = (int)typeSize,
+                m_offset = memOffset,
+                m_typeName = typeName
+            };
+
+            SymbolInfo typeInfo = TryAddSymbol(typeId);
+
+            if (typeInfo != null)
+            {
+                info.m_padding += typeInfo.m_padding;
+            }
+
+            return true;
+        }
+
+        private void ProcessChild(uint typeId, string fieldName, out SymbolInfo info)
+        {
+            CsDebugScript.Engine.SymbolFieldInfo fieldInfo = sym.GetTypeFieldInfo(typeId, fieldName);
+
+            string fieldNameFinal = fieldName;
+
+            if (fieldInfo.isBitField)
+            {
+                fieldNameFinal = "Bitfield: " + fieldNameFinal;
+            }
+
+            info = new SymbolInfo()
+            {
+                m_name = fieldNameFinal,
+                m_typeId = fieldInfo.typeId,
+                m_typeName = sym.GetTypeName(fieldInfo.typeId),
+
+                m_offset = fieldInfo.offset,
+                m_size = (int)sym.GetTypeSize(fieldInfo.typeId),
+                m_padding = 0,
+            };
+
+            TryAddSymbol(info.m_typeId);
+        }
+
+        private SymbolInfo FindSelectedSymbolInfo()
         {
             if (dataGridSymbols.SelectedRows.Count == 0)
+            {
                 return null;
+            }
 
             DataGridViewRow selectedRow = dataGridSymbols.SelectedRows[0];
             string symbolName = selectedRow.Cells[0].Value.ToString();
 
             SymbolInfo info = FindSymbolInfo(symbolName);
+
             return info;
         }
-        SymbolInfo FindSymbolInfo(string name)
+
+        private SymbolInfo FindSymbolInfo(string name)
         {
-            SymbolInfo info;
-            m_symbols.TryGetValue(name, out info);
+            m_symbols.TryGetValue(name, out SymbolInfo info);
+
             return info;
         }
 
-        Dictionary<string, SymbolInfo> m_symbols = new Dictionary<string, SymbolInfo>();
-        DataTable m_table = null;
-        long m_prefetchStartOffset = 0;
+        private void ResetDataTable()
+        {
+            if (m_table != null)
+            {
+                m_table.Rows.Clear();
+                m_table.Columns.Clear();
+            }
 
-        private void dataGridSymbols_SelectionChanged(object sender, EventArgs e)
+            m_table = new DataTable("Symbols");
+
+            bindingSourceSymbols.DataSource = m_table;
+        }
+
+        private void DataGridSymbols_SelectionChanged(object sender, EventArgs e)
         {
             m_prefetchStartOffset = 0;
             ShowSelectedSymbolInfo();
         }
 
-        void ShowSelectedSymbolInfo()
+        private TableViewTypes GetViewType()
         {
+            return dictViewTableTypes[tablePresentationComboBox.Text];
+        }
+
+        private void ShowSelectedSymbolInfo()
+        {
+            SymbolInfo info = null;
+
+            TableViewTypes selectedTableView = GetViewType();
             dataGridViewSymbolInfo.Rows.Clear();
-            SymbolInfo info = FindSelectedSymbolInfo();
-            if (info != null)
-                ShowSymbolInfo(info);
+
+            if (selectedTableView == TableViewTypes.ClassFieldData)
+            {
+                info = FindSelectedSymbolInfo();
+
+                if (info != null)
+                {
+                    ShowSymbolInfo(info);
+                }
+            }
+            else if (selectedTableView == TableViewTypes.ClassStaticData || selectedTableView == TableViewTypes.GlobalStaticData)
+            {
+                ShowSymbolStaticInfo(info);
+            }
         }
 
         void ShowSymbolInfo(SymbolInfo info)
         {
-            dataGridViewSymbolInfo.Rows.Clear();
             if (!info.HasChildren())
+            {
                 return;
+            }
 
             long cacheLineSize = (long)GetCacheLineSize();
             long prevCacheBoundaryOffset = m_prefetchStartOffset;
 
-            if (prevCacheBoundaryOffset > (long)info.m_size)
-                prevCacheBoundaryOffset = (long)info.m_size;
-
             long numCacheLines = 0;
+            long numCacheLinesBetweenChildren = 0;
+            long childEndOffset;
+            long cacheLineOffset = 0;
+            string intersectStatus = "";
+
+            int paddingOffset = 0;
+
             foreach (SymbolInfo child in info.m_children)
             {
-                if (cacheLineSize > 0)
-                {
-                    while (child.m_offset - prevCacheBoundaryOffset >= cacheLineSize)
-                    {
-                        numCacheLines = numCacheLines + 1;
-                        long cacheLineOffset = numCacheLines * cacheLineSize + m_prefetchStartOffset;
-                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), "", "" };
-                        dataGridViewSymbolInfo.Rows.Add(boundaryRow);
-                        prevCacheBoundaryOffset = cacheLineOffset;
-                    }
-                }
-
-                string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_type_name };
+                // Present child info
+                string[] row = { child.m_name, child.m_offset.ToString(), child.m_size.ToString(), child.m_typeName };
                 dataGridViewSymbolInfo.Rows.Add(row);
 
+                // Present child padding info
                 if (child.m_padding > 0)
                 {
-                    long paddingOffset = child.m_offset + child.m_size;
+                    paddingOffset = child.m_offset + child.m_size;
+
                     string[] paddingRow = { "Padding", paddingOffset.ToString(), child.m_padding.ToString(), "" };
                     dataGridViewSymbolInfo.Rows.Add(paddingRow);
+                }
+
+                if (cacheLineSize > 0)
+                {
+                    childEndOffset = child.m_offset + child.m_size + child.m_padding;
+
+                    numCacheLinesBetweenChildren = (childEndOffset - prevCacheBoundaryOffset) / cacheLineSize;
+
+                    if (numCacheLinesBetweenChildren > 0)
+                    {
+                        numCacheLines += numCacheLinesBetweenChildren;
+                        cacheLineOffset = m_prefetchStartOffset + numCacheLines * cacheLineSize;
+
+                        if (cacheLineOffset != childEndOffset)
+                        {
+                            intersectStatus = string.Format("Intesects cacheline: {0}", child.m_name);
+                        }
+                        else
+                        {
+                            intersectStatus = "";
+                        }
+
+                        string cacheInfo = string.Format("{0}x{1}", numCacheLinesBetweenChildren, cacheLineSize);
+                        string[] boundaryRow = { "Cacheline boundary", cacheLineOffset.ToString(), cacheInfo, intersectStatus };
+                        dataGridViewSymbolInfo.Rows.Add(boundaryRow);
+
+                        prevCacheBoundaryOffset = cacheLineOffset;
+                    }
                 }
             }
         }
 
-        private void dataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
+        void ShowSymbolStaticInfo(SymbolInfo info)
+        {
+            // Nothing to show at the moment         
+        }
+
+        private void DataGridSymbols_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
         {
             if (e.Column.Index > 0)
             {
@@ -396,41 +663,73 @@ namespace PadAnalyzer
             }
         }
 
-        private void dataGridViewSymbolInfo_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void SetRowColor(DataGridViewRow inRow, Color inColor)
+        {
+            inRow.Cells[0].Style.BackColor = inColor;
+            inRow.Cells[1].Style.BackColor = inColor;
+            inRow.Cells[2].Style.BackColor = inColor;
+            inRow.Cells[3].Style.BackColor = inColor;
+        }
+
+        private void DataGridViewSymbolInfo_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
             foreach (DataGridViewRow row in dataGridViewSymbolInfo.Rows)
             {
                 DataGridViewCell cell = row.Cells[0];
+
                 if (cell.Value.ToString().StartsWith("Padding"))
                 {
-                    cell.Style.BackColor = Color.LightGray;
-                    row.Cells[1].Style.BackColor = Color.LightGray;
-                    row.Cells[2].Style.BackColor = Color.LightGray;
+                    SetRowColor(row, Color.LightGray);
                 }
                 else if (cell.Value.ToString().IndexOf("Base: ") == 0)
                 {
-                    cell.Style.BackColor = Color.LightGreen;
-                    row.Cells[1].Style.BackColor = Color.LightGreen;
-                    row.Cells[2].Style.BackColor = Color.LightGreen;
+                    SetRowColor(row, Color.LightGreen);
                 }
-                else if (cell.Value.ToString() == "Cacheline boundary")
+                else if (cell.Value.ToString().IndexOf("Bitfield: ") == 0)
                 {
-                    cell.Style.BackColor = Color.LightPink;
-                    row.Cells[1].Style.BackColor = Color.LightPink;
-                    row.Cells[2].Style.BackColor = Color.LightPink;
+                    SetRowColor(row, Color.BlueViolet);
+                    cell.Style.BackColor = Color.BlueViolet;
+                }
+                else if (cell.Value.ToString().IndexOf("Cacheline boundary") >= 0)
+                {
+                    DataGridViewCell cellType = row.Cells[3];
+
+                    if (cellType.Value.ToString().IndexOf("Intesects cacheline") == 0)
+                    {
+                        SetRowColor(row, Color.OrangeRed);
+                    }
+                    else
+                    {
+                        SetRowColor(row, Color.LightPink);
+                    }
                 }
             }
         }
 
-        private void textBoxFilter_TextChanged(object sender, EventArgs e)
+        private void UseFilter(object sender, EventArgs e)
         {
             if (textBoxFilter.Text.Length == 0)
+            {
                 bindingSourceSymbols.Filter = null;
+            }
             else
-                bindingSourceSymbols.Filter = "Symbol LIKE '*" + textBoxFilter.Text + "*'";
+            {
+                string filterToUse = null;
+
+                if (exactSearch.Checked)
+                {
+                    filterToUse = "Symbol = " + '\'' +  textBoxFilter.Text + '\'';
+                }
+                else
+                {
+                    filterToUse = "Symbol LIKE '*" + textBoxFilter.Text + "*'";
+                }
+                    
+                bindingSourceSymbols.Filter = filterToUse;
+            }
         }
 
-        void dumpSymbolInfo(System.IO.TextWriter tw, SymbolInfo info)
+        private void DumpSymbolInfo(System.IO.TextWriter tw, SymbolInfo info)
         {
             tw.WriteLine("Symbol: " + info.m_name);
             tw.WriteLine("Size: " + info.m_size.ToString());
@@ -456,30 +755,34 @@ namespace PadAnalyzer
             }
         }
 
-        private void copyTypeLayoutToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
+        private void CopyTypeLayoutToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
         {
             SymbolInfo info = FindSelectedSymbolInfo();
+
             if (info != null)
             {
                 System.IO.StringWriter tw = new System.IO.StringWriter();
-                dumpSymbolInfo(tw, info);
+                DumpSymbolInfo(tw, info);
                 Clipboard.SetText(tw.ToString());
             }
         }
 
-        private void textBoxCache_KeyPress(object sender, KeyPressEventArgs e)
+        private void TextBoxCache_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Enter || e.KeyChar == (char)Keys.Escape)
+            {
                 ShowSelectedSymbolInfo();
+            }
+
             base.OnKeyPress(e);
         }
 
-        private void textBoxCache_Leave(object sender, EventArgs e)
+        private void TextBoxCache_Leave(object sender, EventArgs e)
         {
             ShowSelectedSymbolInfo();
         }
 
-        private void setPrefetchStartOffsetToolStripMenuItem_Click(object sender, EventArgs e)
+        private void SetPrefetchStartOffsetToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (dataGridViewSymbolInfo.SelectedRows.Count != 0)
             {
@@ -490,43 +793,179 @@ namespace PadAnalyzer
             }
         }
 
-        private void bgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private bool IsDataTableBusy()
         {
-            progressBar.Value = e.ProgressPercentage;
+            return bgWorkerTableData.IsBusy || bgWorker.IsBusy;
         }
 
-        private void bgWorker_DoWork(object sender, DoWorkEventArgs e)
+        private void FillDataTable(object sender, TableViewTypes selectedTableView)
         {
-            PopulateDataTable(e.Argument as string);
-        }
+            BackgroundWorker worker = sender as BackgroundWorker;
 
-        private void bgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            m_table.Rows.Clear();
-            progressBar.Value = progressBar.Maximum;
+            int progressPercent = 0;
+            int prevProgressPercent = -1;
+            int i = 0;
 
             m_table.BeginLoadData();
-            foreach (SymbolInfo info in m_symbols.Values)
+
+            if (selectedTableView == TableViewTypes.ClassFieldData)
             {
-                long totalPadding = info.m_padding;
+                foreach (SymbolInfo info in m_symbols.Values)
+                {
+                    DataRow row = m_table.NewRow();
 
-                DataRow row = m_table.NewRow();
-                row["Symbol"] = info.m_name;
-                row["Size"] = info.m_size;
-                row["Padding"] = totalPadding;
-                row["Padding/Size"] = (double)totalPadding / info.m_size;
-                m_table.Rows.Add(row);
+                    row["Symbol"] = info.m_name;
+                    row["Size"] = info.m_size;
+                    row["Padding"] = info.m_padding;
+                    row["Padding/Size"] = (double)info.m_padding / info.m_size;
+
+                    m_table.Rows.Add(row);
+
+                    // Calculate the current progress
+                    i++;
+                    progressPercent = (int)((i * 100) / m_symbols.Count);
+
+                    if (prevProgressPercent < progressPercent)
+                    {
+                        worker.ReportProgress(progressPercent);
+                        prevProgressPercent = progressPercent;
+                    }
+                }
             }
-            m_table.EndLoadData();
+            else if (selectedTableView == TableViewTypes.ClassStaticData)
+            {
+                foreach (SymbolInfo info in m_symbols.Values)
+                {
+                    string[] staticFieldsList = sym.GetTypeStaticFieldNames(info.m_typeId);
 
-            //
+                    foreach(string staticFieldName in staticFieldsList)
+                    {
+                        // Type info
+                        string typeName = sym.GetTypeName(info.m_typeId);
+
+                        // Static fields info
+                        Tuple<uint, ulong> fieldInfo = sym.GetTypeStaticFieldTypeAndAddress(info.m_typeId, staticFieldName);
+                        uint staticFieldTypeId = fieldInfo.Item1;
+                        string staticFieldType = sym.GetTypeName(staticFieldTypeId);
+                        uint staticFieldSize = sym.GetTypeSize(staticFieldTypeId);
+
+                        string fullStaticName = typeName + "::" + staticFieldName;
+
+                        DataRow row = m_table.NewRow();
+
+                        row["Symbol"] = fullStaticName;
+                        row["Size"] = staticFieldSize;
+                        row["Type"] = staticFieldType;
+
+                        m_table.Rows.Add(row);
+                    }
+
+                    // Calculate the current progress
+                    i++;
+                    progressPercent = ((i * 100) / m_symbols.Count);
+
+                    if (prevProgressPercent < progressPercent)
+                    {
+                        worker.ReportProgress(progressPercent);
+                        prevProgressPercent = progressPercent;
+                    }
+                }
+            }
+            else if (selectedTableView == TableViewTypes.GlobalStaticData)
+            {
+                List<Tuple<string, uint, uint, string>> globalVariableList = sym.GetGlobalVariablesInfo();
+
+                foreach (var (variableName, variableRelativeVirtualAddress, variableTypeId, fileName) in globalVariableList)
+                {
+                    uint globalSymSize = sym.GetTypeSize(variableTypeId);
+                    string globalSymType = sym.GetTypeName(variableTypeId);
+
+                    DataRow row = m_table.NewRow();
+
+                    row["Symbol"] = variableName;
+                    row["Size"] = globalSymSize;
+                    row["Type"] = globalSymType;
+                    row["Object file"] = fileName;  
+
+                    m_table.Rows.Add(row);
+
+                    // Calculate the current progress
+                    i++;
+                    progressPercent = ((i * 100) / globalVariableList.Count);
+
+                    if (prevProgressPercent < progressPercent)
+                    {
+                        worker.ReportProgress(progressPercent);
+                        prevProgressPercent = progressPercent;
+                    }
+                }
+            }
+
+            m_table.EndLoadData();            
+        }
+
+        private void TablePresentationComboBox_ItemChanged(object sender, EventArgs e)
+        {
+            ComboBox viewTablecomboBox = (ComboBox)sender;
+            TableViewTypes selectedTableView = GetViewType();
+
+            if (IsDataTableBusy())
+            {
+                MessageBox.Show("Cannot change the item. Table is still processing.");
+            }
+            else
+            {
+                textBoxFilter.Text = "";
+                tablePresentationComboBox.Enabled = false;
+                ResetDataTable();
+                CreateDataTableColumns(m_table, selectedTableView);
+                
+                bgWorkerTableData.RunWorkerAsync(selectedTableView);
+            }
+        }
+
+        private void BgWorkerTableData_DoWork(object sender, DoWorkEventArgs e)
+        {
+            FillDataTable(sender, (TableViewTypes)e.Argument);
+        }
+
+        private void BgWorkerTableData_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            progressBar.Value = ((progressBar.Maximum * e.ProgressPercentage) / 100);
+        }
+
+        private void BgWorkerTableData_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
             // Sort by name by default (ascending)
             dataGridSymbols.Sort(dataGridSymbols.Columns[0], ListSortDirection.Ascending);
             bindingSourceSymbols.Filter = null;// "Symbol LIKE '*rde*'";
 
             ShowSelectedSymbolInfo();
 
-            this.Text = "Pad Analyzer: Loaded " + currentFileName;
+            progressBar.Value = progressBar.Maximum;
+            tablePresentationComboBox.Enabled = true;
+        }
+
+        private void BgWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            PopulateDataTable(e.Argument as string);
+            FillDataTable(sender, TableViewTypes.ClassFieldData);
+        }
+
+        private void BgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            progressBar.Value = ((progressBar.Maximum * e.ProgressPercentage) / 100);
+        }
+
+        private void BgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            dataGridSymbols.Sort(dataGridSymbols.Columns[0], ListSortDirection.Ascending);
+            bindingSourceSymbols.Filter = null;
+
+            ShowSelectedSymbolInfo();
+
+            Text = "Pad Analyzer: Loaded " + currentFileName;
+            tablePresentationComboBox.Enabled = true;
         }
     }
 }

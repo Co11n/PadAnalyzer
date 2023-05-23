@@ -64,11 +64,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="module">The module.</param>
         public DiaModule(string pdbPath, Module module)
         {
-            IDiaSession diaSession;
-
             dia = DiaLoader.CreateDiaSource();
             dia.loadDataFromPdb(pdbPath);
-            dia.openSession(out diaSession);
+            dia.openSession(out IDiaSession diaSession);
             Initialize(diaSession, module);
             PdbPath = pdbPath;
         }
@@ -218,8 +216,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="typeId">The type identifier.</param>
         private List<Tuple<string, uint, int>> GetTypeFields(uint typeId)
         {
-            var type = GetTypeFromId(typeId);
             List<Tuple<string, uint, int>> typeFields = new List<Tuple<string, uint, int>>();
+
+            var type = GetTypeFromId(typeId);
             var fields = type.GetChildren(SymTagEnum.Data);
 
             foreach (var field in fields)
@@ -252,7 +251,14 @@ namespace CsDebugScript.Engine.SymbolProviders
                     continue;
                 }
 
-                typeFields.Add(Tuple.Create(field.name, field.typeId, field.relativeVirtualAddress + Module.Offset));
+                ulong symbolAddress = 0;
+
+                if (Module != null)
+                {
+                    symbolAddress = field.relativeVirtualAddress + Module.Offset;
+                }
+                
+                typeFields.Add(Tuple.Create(field.name, field.typeId, symbolAddress));                
             }
 
             return typeFields;
@@ -352,10 +358,9 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// <param name="typeName">Name of the type.</param>
         public uint GetTypeId(string typeName)
         {
-            uint typeId;
-
-            if (!TryGetTypeId(typeName, out typeId))
+            if (!TryGetTypeId(typeName, out uint typeId))
                 throw new Exception($"Type name not found: {typeName}");
+
             return typeId;
         }
 
@@ -863,7 +868,7 @@ namespace CsDebugScript.Engine.SymbolProviders
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="fieldName">Name of the field.</param>
-        public Tuple<uint, int> GetTypeFieldTypeAndOffset(uint typeId, string fieldName)
+        public SymbolFieldInfo GetTypeFieldInfo(uint typeId, string fieldName)
         {
             return FixStaFailure(() =>
             {
@@ -883,7 +888,7 @@ namespace CsDebugScript.Engine.SymbolProviders
                         continue;
                     }
 
-                    return Tuple.Create(field.Item2, field.Item3);
+                    return new SymbolFieldInfo(field.Item2, field.Item3, false);
                 }
 
                 throw new Exception("Field not found");
@@ -1188,24 +1193,15 @@ namespace CsDebugScript.Engine.SymbolProviders
             return FixStaFailure(() =>
             {
                 var type = GetTypeFromId(typeId);
-
-                if (type.symTag == SymTagEnum.PointerType)
-                {
-                    //type = type.type;
-                }
-
-                var bases = type.GetBaseClasses();
                 var result = new Dictionary<string, Tuple<uint, int>>();
 
-                foreach (var b in bases.Reverse())
+                foreach (var b in type.GetBaseClasses().Reverse())
                 {
                     int offset = b.virtualBaseClass ? int.MinValue : b.offset;
 
-                    uint btypeId;
-
-                    if (TryGetTypeId(b.name, out btypeId))
+                    if (TryGetTypeId(b.name, out uint btypeId))
                     {
-                        result.Add(b.name, Tuple.Create(btypeId, offset));
+                        result.Add(b.name, Tuple.Create(btypeId, b.offset));
                     }
                 }
 
@@ -1433,5 +1429,101 @@ namespace CsDebugScript.Engine.SymbolProviders
                 }
             }
         }
+
+        /// <summary>
+        /// Get list with section information (object file name, relative virtual address, section size)  
+        /// </summary>
+        private List<Tuple<string, uint, ulong>> GetSectionsContribInfoList()
+        {
+            List<Tuple<string, uint, ulong>> sectionsContribInfoList = new List<Tuple<string, uint, ulong>>();
+
+            IDiaEnumSectionContribs sectionContibTable = null;
+
+            foreach (IDiaTable table in session.getEnumTables())
+            {
+                sectionContibTable = table as IDiaEnumSectionContribs;
+                
+                if (sectionContibTable != null)
+                {
+                    break;
+                }
+            }
+
+            if (sectionContibTable != null)
+            {
+                foreach (IDiaSectionContrib sectionContrib in sectionContibTable)
+                {
+                    sectionsContribInfoList.Add(Tuple.Create<string, uint, ulong>(
+                        sectionContrib.compiland.name, sectionContrib.relativeVirtualAddress, sectionContrib.length));
+                }
+            }
+
+            return sectionsContribInfoList;
+        }
+
+        private class SymbolAddressComparator : IComparer<Tuple<string, uint, ulong>>
+        {
+            public int Compare(Tuple<string, uint, ulong> a, Tuple<string, uint, ulong> b)
+            {
+                if (a.Item2 > b.Item2)
+                {
+                    return 1;
+                }
+                else if (a.Item2 < b.Item2)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get List of global variables symbols
+        /// </summary>
+        /// <returns></returns>
+        public List<Tuple<string, uint, uint, string>> GetGlobalVariablesInfo()
+        {
+            List<Tuple<string, uint, uint, string>> globalVariableList = new List<Tuple<string, uint, uint, string>>();
+            List<Tuple<string, uint, ulong>> sectionContribInfo = GetSectionsContribInfoList();
+            int sectionContribIndex = -1;
+
+            uint globalScopeTypeId = GetGlobalScope();
+            IDiaSymbol type = GetTypeFromId(globalScopeTypeId);
+            IEnumerable<IDiaSymbol> globalVariables = type.GetChildren(SymTagEnum.Data);
+
+            SymbolAddressComparator symAddressCompare = new SymbolAddressComparator();
+
+            foreach (IDiaSymbol variable in globalVariables)
+            {
+                Tuple<string, uint, ulong> searchObject = new Tuple<string, uint, ulong>("", variable.relativeVirtualAddress, 0);
+                string objectFileName = "No file name";
+
+                sectionContribIndex = sectionContribInfo.BinarySearch(searchObject, symAddressCompare);
+                sectionContribIndex = (sectionContribIndex < 0) ? (sectionContribIndex ^ (-1)) - 1 : sectionContribIndex;
+
+                if (sectionContribIndex >= 0)
+                {
+                    ulong endSectionRVA = sectionContribInfo[sectionContribIndex].Item2 + sectionContribInfo[sectionContribIndex].Item3;
+
+                    if (variable.relativeVirtualAddress < endSectionRVA)
+                    {
+                        objectFileName = System.IO.Path.GetFileName(sectionContribInfo[sectionContribIndex].Item1);
+                    }
+                }
+
+                globalVariableList.Add(Tuple.Create(variable.name, variable.relativeVirtualAddress, variable.typeId, objectFileName));
+            }
+
+            return globalVariableList;
+        }
+
+        /// <summary>
+        /// Get the pointer of VTable type
+        /// </summary>
+        /// <returns></returns>
+        public ulong GetPointerVTableSize(uint typeId) { return 0; }
     }
 }
